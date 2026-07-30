@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 import random
 import statistics
 import time
@@ -258,6 +259,69 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     temporary.replace(path)
 
 
+def _append_durable_jsonl(path: Path, row: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _publish_progress(
+    output_dir: Path,
+    *,
+    stage: str,
+    stage_done: int,
+    stage_total: int,
+    overall_done: int,
+    overall_total: int,
+    latest: dict[str, Any] | None,
+    stage_started: float,
+) -> None:
+    elapsed = max(0.0, time.perf_counter() - stage_started)
+    remaining = max(0, stage_total - stage_done)
+    eta_seconds = (
+        elapsed / stage_done * remaining if stage_done > 0 else None
+    )
+    progress = {
+        "stage": stage,
+        "stage_completed": stage_done,
+        "stage_total": stage_total,
+        "stage_percent": 100.0 * stage_done / max(1, stage_total),
+        "overall_completed": overall_done,
+        "overall_total": overall_total,
+        "overall_percent": 100.0 * overall_done / max(1, overall_total),
+        "stage_elapsed_seconds": elapsed,
+        "stage_eta_seconds": eta_seconds,
+        "latest_algorithm": latest.get("algorithm_id") if latest else None,
+        "latest_trial_id": latest.get("trial_id") if latest else None,
+        "latest_case_id": latest.get("case_id") if latest else None,
+        "latest_status": latest.get("status") if latest else None,
+    }
+    progress_path = output_dir / "progress.json"
+    temporary = progress_path.with_suffix(".json.tmp")
+    temporary.write_text(
+        json.dumps(progress, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(progress_path)
+    message = (
+        f"[{stage}] {stage_done}/{stage_total} "
+        f"({progress['stage_percent']:.1f}%) | overall "
+        f"{overall_done}/{overall_total} ({progress['overall_percent']:.1f}%)"
+    )
+    if latest:
+        message += (
+            f" | {latest['algorithm_id']} | {latest['trial_id']} "
+            f"| {latest['case_id']} | {latest['status']}"
+        )
+    print(message, flush=True)
+    with (output_dir / "progress.log").open("a", encoding="utf-8") as handle:
+        handle.write(message + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
 def run_tuning(
     spec_path: Path,
     output_dir: Path,
@@ -337,7 +401,10 @@ def run_tuning(
                 existing[(row["stage"], row["trial_id"], row["case_id"])] = row
 
     all_stage_rankings: list[dict[str, Any]] = []
+    overall_total = sum(int(stage["planned_runs"]) for stage in plan["stages"])
+    overall_done = 0
     for stage in stages:
+        stage_started = time.perf_counter()
         stage_cases = select_stage_cases(all_cases, spec["scenario_filter"], stage["seeds"])
         jobs = []
         stage_rows = []
@@ -361,20 +428,43 @@ def run_tuning(
                             "identity": identity, "case": case,
                             "algorithm_config": trial["config"], "rounds": stage["rounds"],
                         })
+        stage_total = len(stage_rows) + len(jobs)
+        stage_done = len(stage_rows)
+        overall_done += stage_done
+        _publish_progress(
+            output_dir, stage=stage["name"],
+            stage_done=stage_done, stage_total=stage_total,
+            overall_done=overall_done, overall_total=overall_total,
+            latest=None, stage_started=stage_started,
+        )
         if int(workers) <= 1:
             for job in jobs:
                 row = _run_trial_job(job)
                 stage_rows.append(row)
-                with results_path.open("a", encoding="utf-8") as handle:
-                    handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+                _append_durable_jsonl(results_path, row)
+                stage_done += 1
+                overall_done += 1
+                _publish_progress(
+                    output_dir, stage=stage["name"],
+                    stage_done=stage_done, stage_total=stage_total,
+                    overall_done=overall_done, overall_total=overall_total,
+                    latest=row, stage_started=stage_started,
+                )
         else:
             with ProcessPoolExecutor(max_workers=int(workers)) as executor:
                 futures = [executor.submit(_run_trial_job, job) for job in jobs]
                 for future in as_completed(futures):
                     row = future.result()
                     stage_rows.append(row)
-                    with results_path.open("a", encoding="utf-8") as handle:
-                        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+                    _append_durable_jsonl(results_path, row)
+                    stage_done += 1
+                    overall_done += 1
+                    _publish_progress(
+                        output_dir, stage=stage["name"],
+                        stage_done=stage_done, stage_total=stage_total,
+                        overall_done=overall_done, overall_total=overall_total,
+                        latest=row, stage_started=stage_started,
+                    )
         rankings = aggregate_rankings(stage_rows, len(stage_cases))
         for row in rankings:
             row["stage"] = stage["name"]

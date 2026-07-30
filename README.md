@@ -89,6 +89,16 @@ command resumes completed trials from `trials.jsonl`. The main artifacts are:
 - `best_summary.json`;
 - `rankings_<stage>.csv` and `rankings_all_stages.csv`;
 - `manifest.json` and `trials.jsonl`.
+- `progress.json` for the current machine-readable counter;
+- `progress.log` for the append-only human-readable progress history.
+
+Each completed simulation is flushed to `trials.jsonl` before the next progress
+update is published. To inspect a running Kaggle job:
+
+```bash
+cat /kaggle/working/uwsn_tuning_pso/progress.json
+tail -n 20 /kaggle/working/uwsn_tuning_pso/progress.log
+```
 
 The search space, stage budgets, seeds and scenario filters are defined in
 `configs/tuning/kaggle_large.yaml`. Raw per-round objective values are not
