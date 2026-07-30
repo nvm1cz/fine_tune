@@ -70,6 +70,18 @@ python scripts/run_kaggle_tuning.py \
   --workers 4
 ```
 
+To run one optimizer per Kaggle session, give each optimizer its own output
+directory:
+
+```bash
+python scripts/run_kaggle_tuning.py --algorithm eulc_pso \
+  --output-dir /kaggle/working/uwsn_tuning_pso --execute --workers 4
+python scripts/run_kaggle_tuning.py --algorithm eulc_ga \
+  --output-dir /kaggle/working/uwsn_tuning_ga --execute --workers 4
+python scripts/run_kaggle_tuning.py --algorithm eulc_ac_aco \
+  --output-dir /kaggle/working/uwsn_tuning_ac_aco --execute --workers 4
+```
+
 Results are written to `/kaggle/working/uwsn_tuning`. Re-running the same
 command resumes completed trials from `trials.jsonl`. The main artifacts are:
 

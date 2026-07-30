@@ -26,10 +26,15 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=max(1, min(4, os.cpu_count() or 1)))
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument(
+        "--algorithm",
+        choices=("eulc_pso", "eulc_ga", "eulc_ac_aco"),
+        help="Tune only one optimizer; omit to tune all three.",
+    )
     args = parser.parse_args()
     result = run_tuning(
         args.config, args.output_dir, workers=args.workers,
-        execute=args.execute, smoke=args.smoke,
+        execute=args.execute, smoke=args.smoke, algorithm_id=args.algorithm,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
 

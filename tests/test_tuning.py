@@ -11,6 +11,7 @@ from uwsn.tuning import (
     sample_trial_configs,
     select_stage_cases,
     stable_hash,
+    run_tuning,
 )
 
 
@@ -85,6 +86,15 @@ class TuningTests(unittest.TestCase):
 
     def test_stable_hash_ignores_mapping_order(self) -> None:
         self.assertEqual(stable_hash({"a": 1, "b": 2}), stable_hash({"b": 2, "a": 1}))
+
+    def test_plan_can_select_one_algorithm(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            plan = run_tuning(
+                SPEC_PATH, Path(directory), execute=False,
+                algorithm_id="eulc_ga",
+            )
+        self.assertEqual(plan["algorithms"], ["eulc_ga"])
+        self.assertEqual(plan["stages"][0]["planned_runs"], 720)
 
 
 if __name__ == "__main__":

@@ -265,6 +265,7 @@ def run_tuning(
     workers: int = 2,
     execute: bool = False,
     smoke: bool = False,
+    algorithm_id: str | None = None,
 ) -> dict[str, Any]:
     root = spec_path.resolve().parents[2]
     spec = load_yaml(spec_path)
@@ -273,23 +274,29 @@ def run_tuning(
     stages = copy.deepcopy(spec["stages"])
     if smoke:
         stages = [{"name": "smoke", "rounds": 2, "seeds": [0], "keep": 1}]
+    selected_algorithms = (
+        (algorithm_id,) if algorithm_id is not None else TUNED_ALGORITHMS
+    )
+    if any(value not in TUNED_ALGORITHMS for value in selected_algorithms):
+        raise ValueError(f"unsupported tuning algorithm: {algorithm_id}")
     candidates: dict[str, list[dict[str, Any]]] = {}
-    for offset, algorithm_id in enumerate(TUNED_ALGORITHMS):
-        base = load_algorithm_config(root / spec["algorithms"][algorithm_id])
-        candidates[algorithm_id] = sample_trial_configs(
-            base, algorithm_id, spec["search_spaces"][algorithm_id],
+    for offset, selected_id in enumerate(selected_algorithms):
+        base = load_algorithm_config(root / spec["algorithms"][selected_id])
+        candidates[selected_id] = sample_trial_configs(
+            base, selected_id, spec["search_spaces"][selected_id],
             candidate_count, int(spec["tuning_seed"]) + offset,
         )
         if smoke:
-            for trial in candidates[algorithm_id]:
+            for trial in candidates[selected_id]:
                 trial["config"]["optimizer"]["population_size"] = 4
                 trial["config"]["optimizer"]["max_iterations"] = 1
                 trial["config"]["optimizer"]["fitness_evaluation_budget"] = 4
                 fingerprint = stable_hash(trial["config"])
                 trial["config_hash"] = fingerprint
-                trial["trial_id"] = f"{algorithm_id}__{fingerprint}"
+                trial["trial_id"] = f"{selected_id}__{fingerprint}"
     plan = {
         "name": spec["name"], "execute": execute, "smoke": smoke,
+        "algorithms": list(selected_algorithms),
         "workers": int(workers), "candidate_count_per_algorithm": candidate_count,
         "stages": [], "ranking_policy": [
             "completion_rate:max", "median_survival_score:max",
@@ -309,7 +316,7 @@ def run_tuning(
             "candidates_per_algorithm": planned_candidates_per_algorithm,
             "cases_per_trial": len(stage_cases),
             "planned_runs": (
-                len(TUNED_ALGORITHMS)
+                len(selected_algorithms)
                 * planned_candidates_per_algorithm
                 * len(stage_cases)
             ),
@@ -374,7 +381,7 @@ def run_tuning(
         _write_csv(output_dir / f"rankings_{stage['name']}.csv", rankings)
         all_stage_rankings.extend(rankings)
         promoted: dict[str, list[dict[str, Any]]] = {}
-        for algorithm_id in TUNED_ALGORITHMS:
+        for algorithm_id in selected_algorithms:
             keep_ids = {
                 row["trial_id"] for row in rankings
                 if row["algorithm_id"] == algorithm_id
