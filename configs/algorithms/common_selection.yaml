@@ -1,0 +1,6 @@
+{
+  "protocol": {
+    "ch_ratio": 0.05,
+    "candidate_ratio": 0.20
+  }
+}

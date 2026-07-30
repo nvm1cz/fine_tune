@@ -1,0 +1,22 @@
+{
+  "experiment_set": "benchmark",
+  "base_configs": ["configs/base/environment.yaml", "configs/base/channel.yaml", "configs/base/protocol.yaml", "configs/base/execution.yaml", "configs/base/objective.yaml"],
+  "algorithms": ["configs/algorithms/eulc_pso.yaml", "configs/algorithms/eulc_ga.yaml", "configs/algorithms/eulc_ac_aco.yaml", "configs/algorithms/leach.yaml", "configs/algorithms/eulc.yaml", "configs/algorithms/eeumc.yaml", "configs/algorithms/ebrec.yaml"],
+  "mode": "cartesian",
+  "deployment_sizes": [[100,100,100],[200,200,200],[300,300,300],[500,500,500]],
+  "densities": ["sparse","medium","dense"],
+  "distributions": ["uniform","gaussian","exponential"],
+  "seeds": [0,1,2,3,4,5,6,7,8,9],
+  "node_count_mapping": {
+    "100x100x100":{"sparse":50,"medium":100,"dense":150},
+    "200x200x200":{"sparse":100,"medium":200,"dense":300},
+    "300x300x300":{"sparse":150,"medium":300,"dense":450},
+    "500x500x500":{"sparse":200,"medium":500,"dense":1000}
+  },
+  "overrides": {
+    "environment":{"initial_energy_j":0.5,"packet_size_bits":6400},
+    "channel":{"sound_speed_model":"constant","sound_speed_mps":1500.0},
+    "execution":{"rounds":1000,"stop_on_first_dead":false}
+  },
+  "sweep": {"channel.transmission_range_m":[200.0]}
+}

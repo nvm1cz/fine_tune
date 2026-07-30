@@ -1,0 +1,19 @@
+{
+  "experiment_set": "sensitivity_objective_lambda",
+  "base_configs": ["configs/base/environment.yaml", "configs/base/channel.yaml", "configs/base/protocol.yaml", "configs/base/execution.yaml", "configs/base/objective.yaml"],
+  "algorithms": ["configs/algorithms/eulc_pso.yaml", "configs/algorithms/eulc_ga.yaml", "configs/algorithms/eulc_ac_aco.yaml"],
+  "mode": "scenarios",
+  "scenarios": [
+    {"deployment_size_m":[100,100,100],"density":"medium","distribution":"uniform"}
+  ],
+  "seeds": [0,1,2,3,4,5,6,7,8,9],
+  "node_count_mapping": {
+    "100x100x100":{"sparse":50,"medium":100,"dense":150}
+  },
+  "overrides": {
+    "environment":{"initial_energy_j":0.5,"packet_size_bits":6400},
+    "channel":{"transmission_range_m":200.0,"sound_speed_model":"constant","sound_speed_mps":1500.0},
+    "execution":{"rounds":1000,"stop_on_first_dead":false}
+  },
+  "sweep": {"objective.lambda":[0.3,0.5,0.7]}
+}

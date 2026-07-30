@@ -1,0 +1,15 @@
+{
+  "environment": {
+    "deployment_size_m": [100, 100, 100],
+    "node_count": 100,
+    "distribution": "uniform",
+    "gaussian_std_fraction": 0.18,
+    "exponential_scale_fraction": 0.35,
+    "sink_count": 1,
+    "sink_position": [50.0, 50.0, 0.0],
+    "initial_energy_j": 0.5,
+    "packet_size_bits": 6400,
+    "data_generation_rate_packets_per_alive_node_per_round": 1
+  },
+  "metadata": {}
+}

@@ -1,0 +1,1 @@
+{"algorithm":{"id":"eeumc","family":"clustering_routing"},"protocol":{"competition_radius_m":20.0,"layer_spacing_m":10.0,"recluster_interval_rounds":20},"eeumc":{"alpha":0.6}}

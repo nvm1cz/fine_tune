@@ -1,0 +1,28 @@
+{
+  "protocol": {
+    "assignment_mode": "strongest_rssi",
+    "fallback_assignment_mode": "nearest_feasible",
+    "require_all_alive_nodes_assigned": true,
+    "routing_mode": "joint_optimized",
+    "reuse_optimized_route_plan": true,
+    "validate_route_every_round": true,
+    "routing_max_hops": 100,
+    "routing_plan_search_limit": 128,
+    "reoptimize_on_invalid_assignment": true,
+    "reoptimize_on_broken_route": true,
+    "reoptimize_on_dead_ch_or_relay": true,
+    "aggregation": {
+      "output_packet_size_mode": "fixed_original_size",
+      "relay_reaggregation": false
+    },
+    "node_death_threshold_j": 0.075,
+    "broadcast_packet_size_bits": 200,
+    "transmit_power_p0": 3.0,
+    "electronic_energy_e1_nj": 5.0,
+    "processing_energy_nj": 50.0,
+    "energy_calibration_factor": 1.0,
+    "contention_penalty_factor": 0.0,
+    "contention_reference_degree": 10.0,
+    "contention_max_multiplier": 4.0
+  }
+}

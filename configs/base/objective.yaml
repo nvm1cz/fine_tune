@@ -1,0 +1,10 @@
+{
+  "objective": {
+    "name": "normalized_multiplicative_energy_delay_objective",
+    "direction": "minimize",
+    "lambda": 0.5,
+    "energy_epsilon_j": 1e-12,
+    "delay_epsilon_s": 1e-12,
+    "dimensionless_epsilon": 1e-12
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "execution": {
+    "rounds": 1000,
+    "stop_on_first_dead": false,
+    "stop_at_first_5pct_dead": false,
+    "min_alive_ratio": null,
+    "mobility_enabled": true,
+    "mobility_model": "tidal_rbf",
+    "round_duration_seconds": 1.0,
+    "mobility_update_interval_rounds": 2,
+    "boundary_policy": "clip",
+    "move_dead_nodes": false
+  },
+  "output": {
+    "root_dir": "results",
+    "save_round_metrics": true,
+    "save_convergence": true
+  }
+}

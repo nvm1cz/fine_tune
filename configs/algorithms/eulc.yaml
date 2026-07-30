@@ -1,0 +1,1 @@
+{"algorithm":{"id":"eulc","family":"clustering_routing","base_protocol":"eulc"},"protocol":{"initial_layer_width_m":20.0,"layer_spacing_increment_m":10.0,"competition_radius_mode":"dynamic_eulc","competition_adjustment_factor":0.50,"recluster_interval_rounds":1},"eulc":{"alpha":0.40,"beta":0.40,"gamma":0.20}}
