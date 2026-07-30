@@ -11,7 +11,7 @@ import statistics
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from .algorithms.config import load_algorithm_config, validate_algorithm_config
 from .experiment_config.generation import ExperimentGenerator
@@ -330,6 +330,7 @@ def run_tuning(
     execute: bool = False,
     smoke: bool = False,
     algorithm_id: str | None = None,
+    checkpoint_callback: Callable[[Path, str], None] | None = None,
 ) -> dict[str, Any]:
     root = spec_path.resolve().parents[2]
     spec = load_yaml(spec_path)
@@ -450,6 +451,11 @@ def run_tuning(
                     overall_done=overall_done, overall_total=overall_total,
                     latest=row, stage_started=stage_started,
                 )
+                if checkpoint_callback is not None:
+                    checkpoint_callback(
+                        output_dir,
+                        f"{stage['name']} {stage_done}/{stage_total}",
+                    )
         else:
             with ProcessPoolExecutor(max_workers=int(workers)) as executor:
                 futures = [executor.submit(_run_trial_job, job) for job in jobs]
@@ -465,6 +471,11 @@ def run_tuning(
                         overall_done=overall_done, overall_total=overall_total,
                         latest=row, stage_started=stage_started,
                     )
+                    if checkpoint_callback is not None:
+                        checkpoint_callback(
+                            output_dir,
+                            f"{stage['name']} {stage_done}/{stage_total}",
+                        )
         rankings = aggregate_rankings(stage_rows, len(stage_cases))
         for row in rankings:
             row["stage"] = stage["name"]
@@ -508,4 +519,6 @@ def run_tuning(
         json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     _write_csv(output_dir / "rankings_all_stages.csv", all_stage_rankings)
+    if checkpoint_callback is not None:
+        checkpoint_callback(output_dir, "tuning completed")
     return best_summary

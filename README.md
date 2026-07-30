@@ -82,6 +82,32 @@ python scripts/run_kaggle_tuning.py --algorithm eulc_ac_aco \
   --output-dir /kaggle/working/uwsn_tuning_ac_aco --execute --workers 4
 ```
 
+For scheduled runs, use a separate private Kaggle Dataset for each optimizer.
+The runner restores its latest checkpoint before tuning and creates a new
+Dataset Version immediately after every completed simulation:
+
+```bash
+python scripts/run_kaggle_tuning.py --algorithm eulc_pso \
+  --output-dir /kaggle/working/uwsn_tuning_pso \
+  --checkpoint-dataset nguyenvuminh/uwsn-checkpoint-pso \
+  --execute --workers 4
+
+python scripts/run_kaggle_tuning.py --algorithm eulc_ga \
+  --output-dir /kaggle/working/uwsn_tuning_ga \
+  --checkpoint-dataset nguyenvuminh/uwsn-checkpoint-ga \
+  --execute --workers 4
+
+python scripts/run_kaggle_tuning.py --algorithm eulc_ac_aco \
+  --output-dir /kaggle/working/uwsn_tuning_ac_aco \
+  --checkpoint-dataset nguyenvuminh/uwsn-checkpoint-ac-aco \
+  --execute --workers 4
+```
+
+If remote upload fails after three attempts, the runner stops instead of
+continuing without a recoverable checkpoint. Kaggle scheduled runs start at
+their configured time; they do not automatically start at the exact instant a
+previous 12-hour session ends.
+
 Results are written to `/kaggle/working/uwsn_tuning`. Re-running the same
 command resumes completed trials from `trials.jsonl`. The main artifacts are:
 

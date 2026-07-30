@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from uwsn.tuning import run_tuning
+from uwsn.kaggle_checkpoint import KaggleDatasetCheckpoint
 
 
 def main() -> None:
@@ -31,10 +32,21 @@ def main() -> None:
         choices=("eulc_pso", "eulc_ga", "eulc_ac_aco"),
         help="Tune only one optimizer; omit to tune all three.",
     )
+    parser.add_argument(
+        "--checkpoint-dataset",
+        help="Kaggle Dataset handle used for cross-session checkpointing.",
+    )
     args = parser.parse_args()
+    checkpoint = (
+        KaggleDatasetCheckpoint(args.checkpoint_dataset)
+        if args.checkpoint_dataset else None
+    )
+    if checkpoint is not None and args.execute:
+        checkpoint.restore(args.output_dir)
     result = run_tuning(
         args.config, args.output_dir, workers=args.workers,
         execute=args.execute, smoke=args.smoke, algorithm_id=args.algorithm,
+        checkpoint_callback=checkpoint.publish if checkpoint is not None else None,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
