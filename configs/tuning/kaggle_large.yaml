@@ -1,0 +1,46 @@
+{
+  "name": "kaggle_large_optimizer_tuning_v1",
+  "experiment_set": "configs/experiment_sets/benchmark.yaml",
+  "algorithms": {
+    "eulc_pso": "configs/algorithms/eulc_pso.yaml",
+    "eulc_ga": "configs/algorithms/eulc_ga.yaml",
+    "eulc_ac_aco": "configs/algorithms/eulc_ac_aco.yaml"
+  },
+  "tuning_seed": 20260730,
+  "candidates_per_algorithm": 120,
+  "scenario_filter": {
+    "deployment_size_m": [100, 100, 100],
+    "density": "medium",
+    "distributions": ["uniform", "gaussian", "exponential"]
+  },
+  "stages": [
+    {"name": "screen", "rounds": 50, "seeds": [0, 1], "keep": 24},
+    {"name": "refine", "rounds": 200, "seeds": [0, 1, 2, 3, 4], "keep": 6},
+    {"name": "validate", "rounds": 1000, "seeds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], "keep": 1}
+  ],
+  "search_spaces": {
+    "eulc_pso": {
+      "budget_pairs": [[20, 49], [25, 39], [40, 24], [50, 19]],
+      "inertia": [0.4, 0.55, 0.7, 0.85, 0.9],
+      "c1": [0.8, 1.2, 1.6, 2.0],
+      "c2": [0.8, 1.2, 1.6, 2.0],
+      "omega": [0.3, 0.45, 0.6, 0.75, 0.9],
+      "stagnation_restart_iterations": [3, 5, 10, 20],
+      "stagnation_restart_fraction": [0.1, 0.25, 0.5]
+    },
+    "eulc_ga": {
+      "budget_pairs": [[20, 49], [25, 39], [40, 24], [50, 19]],
+      "crossover_rate": [0.6, 0.7, 0.8, 0.9, 0.95],
+      "mutation_sigma": [0.02, 0.05, 0.1, 0.15, 0.2, 0.3]
+    },
+    "eulc_ac_aco": {
+      "budget_pairs": [[20, 50], [25, 40], [40, 25], [50, 20]],
+      "alpha": [0.5, 1.0, 1.5, 2.0],
+      "beta_schedule": [[0.5, 2.0], [1.0, 3.0], [1.5, 4.0], [2.0, 5.0]],
+      "rho_schedule": [[0.3, 0.05], [0.5, 0.1], [0.65, 0.15], [0.8, 0.3]],
+      "chaos_strength": [0.0, 0.05, 0.1, 0.2, 0.3],
+      "stagnation_limit": [5, 10, 20],
+      "heuristic_weights": [[0.6, 0.2, 0.2], [0.5, 0.25, 0.25], [0.4, 0.4, 0.2], [0.34, 0.33, 0.33]]
+    }
+  }
+}

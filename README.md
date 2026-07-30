@@ -39,3 +39,46 @@ python scripts/run_experiment_case.py \
 ```
 
 Generated cases and result directories are excluded from Git.
+
+## Tune on Kaggle
+
+The tuner uses the same benchmark scenarios and scoring policy for PSO, GA and
+AC-ACO. It applies successive halving: many configurations are screened cheaply,
+then only the strongest configurations reach the 200-round and 1,000-round
+stages.
+
+Preview the workload without running simulations:
+
+```bash
+python scripts/run_kaggle_tuning.py
+```
+
+Run a small end-to-end check:
+
+```bash
+python scripts/run_kaggle_tuning.py \
+  --smoke \
+  --execute \
+  --workers 1
+```
+
+Run the full search on Kaggle:
+
+```bash
+python scripts/run_kaggle_tuning.py \
+  --execute \
+  --workers 4
+```
+
+Results are written to `/kaggle/working/uwsn_tuning`. Re-running the same
+command resumes completed trials from `trials.jsonl`. The main artifacts are:
+
+- `best_config_pso.yaml`, `best_config_ga.yaml`, `best_config_ac_aco.yaml`;
+- `best_summary.json`;
+- `rankings_<stage>.csv` and `rankings_all_stages.csv`;
+- `manifest.json` and `trials.jsonl`.
+
+The search space, stage budgets, seeds and scenario filters are defined in
+`configs/tuning/kaggle_large.yaml`. Raw per-round objective values are not
+averaged across different network states; configurations are ranked using
+run-level lifetime, residual-energy AUC, delivery, delay and runtime metrics.
