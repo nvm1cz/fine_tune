@@ -23,6 +23,47 @@ class AmbientNoise:
     total_db: float
 
 
+@dataclass(frozen=True)
+class StaticChannelEnvironment:
+    """Channel terms that are invariant for every link in one evaluation context."""
+
+    frequency_khz: float
+    absorption_db_per_km: float
+    noise: AmbientNoise
+    noise_power_db: float
+
+
+def build_static_channel_environment(
+    freq_khz: float,
+    params: TunableParams,
+) -> StaticChannelEnvironment:
+    """Build immutable environment terms without changing scalar model formulas."""
+    frequency = _positive_frequency(freq_khz)
+    bandwidth = float(params.channel_bandwidth_hz)
+    shipping = float(params.shipping_noise_factor)
+    wind = float(params.wind_speed_mps)
+    if bandwidth <= 0.0:
+        raise ValueError("channel_bandwidth_hz must be positive")
+    if not 0.0 <= shipping <= 1.0:
+        raise ValueError("shipping_noise_factor must be in [0, 1]")
+    if wind < 0.0:
+        raise ValueError("wind_speed_mps must be non-negative")
+    noise = ambient_noise(
+        frequency,
+        shipping,
+        wind,
+        params.noise_model,
+        params.noise_formula_mode,
+    )
+    return StaticChannelEnvironment(
+        frequency_khz=frequency,
+        absorption_db_per_km=float(thorp_absorption_db_per_km(frequency)),
+        noise=noise,
+        noise_power_db=float(noise.total_db)
+        + 10.0 * float(np.log10(bandwidth)),
+    )
+
+
 def turbulence_noise_db(freq_khz: float) -> float:
     f = _positive_frequency(freq_khz)
     return 17.0 - 30.0 * float(np.log10(f))
@@ -243,6 +284,101 @@ def channel_quality(
         "channel_capacity_bps": shannon_capacity_bps(bandwidth, snr),
         "snr_threshold_passed": snr_threshold_passed,
         "success_threshold_passed": success_threshold_passed,
+    }
+    if not all(np.isfinite(value) for value in result.values()):
+        raise ValueError("channel quality contains NaN or infinity")
+    return result
+
+
+def channel_quality_with_static_environment(
+    distance_m: float,
+    packet_bits: int,
+    params: TunableParams,
+    environment: StaticChannelEnvironment,
+) -> dict[str, float]:
+    """Optimized deterministic path using precomputed environment-only terms.
+
+    This deliberately preserves the scalar attenuation and floating-point operation
+    order used by ``channel_quality``. The reference function remains independent.
+    """
+    distance = float(distance_m)
+    frequency = environment.frequency_khz
+    bits = int(packet_bits)
+    bandwidth = float(params.channel_bandwidth_hz)
+    spreading = float(params.spreading_factor)
+    source_level = params.source_level_db
+    if distance < 0.0:
+        raise ValueError("distance_m must be non-negative")
+    if bits <= 0:
+        raise ValueError("packet_bits must be positive")
+    if bandwidth <= 0.0:
+        raise ValueError("channel_bandwidth_hz must be positive")
+    if spreading <= 0.0:
+        raise ValueError("spreading_factor must be positive")
+    if source_level is None:
+        raise ValueError(
+            "source_level_db is required; transmit power in Watt cannot be treated as dB"
+        )
+
+    attenuation = attenuation_linear(
+        distance,
+        frequency,
+        spreading,
+        params.acoustic_reference_attenuation_linear,
+        params.acoustic_reference_distance_m,
+        params.acoustic_model_version,
+        params.transmission_anomaly_db,
+    )
+    loss_db = transmission_loss_db(
+        distance,
+        frequency,
+        spreading,
+        params.acoustic_reference_attenuation_linear,
+        params.acoustic_reference_distance_m,
+        params.acoustic_model_version,
+        params.transmission_anomaly_db,
+    )
+    snr_db = (
+        float(source_level)
+        - loss_db
+        - environment.noise_power_db
+        + float(params.directivity_index_db)
+    )
+    snr = db_to_linear(snr_db)
+    if params.fading_model == "none":
+        ber = awgn_bpsk_ber_from_snr_linear(snr)
+    elif params.fading_model == "rayleigh":
+        ber = ber_from_snr_linear(snr)
+    elif params.fading_model == "rician":
+        ber = rician_ber_from_snr_linear(snr, params.rician_k_linear)
+    else:
+        raise ValueError("fading_model must be none, rayleigh or rician")
+    success = packet_success_probability(ber, bits)
+    minimum_snr = params.minimum_snr_db
+    minimum_success = params.minimum_success_probability
+    if minimum_success is not None:
+        threshold = float(minimum_success)
+        if not 0.0 <= threshold <= 1.0:
+            raise ValueError("minimum_success_probability must be in [0, 1]")
+    result = {
+        "distance_m": distance,
+        "frequency_khz": frequency,
+        "frequency_hz": khz_to_hz(frequency),
+        "absorption_db_per_km": environment.absorption_db_per_km,
+        "attenuation_linear": attenuation,
+        "transmission_loss_db": loss_db,
+        "noise_psd_db": float(environment.noise.total_db),
+        "noise_power_db": environment.noise_power_db,
+        "snr_db": snr_db,
+        "snr_linear": snr,
+        "ber": ber,
+        "per": 1.0 - success,
+        "packet_success_probability": success,
+        "channel_capacity_bps": shannon_capacity_bps(bandwidth, snr),
+        "snr_threshold_passed": minimum_snr is None or snr_db >= float(minimum_snr),
+        "success_threshold_passed": (
+            minimum_success is None or success >= float(minimum_success)
+        ),
     }
     if not all(np.isfinite(value) for value in result.values()):
         raise ValueError("channel quality contains NaN or infinity")

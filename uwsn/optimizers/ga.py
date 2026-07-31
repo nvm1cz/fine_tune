@@ -14,7 +14,7 @@ from .common import (
     _target_cluster_head_count,
     evaluate_solution_result,
 )
-from ..objective import ObjectiveResult
+from ..objective import EnergyDelayObjective, ObjectiveResult, RoundObjectiveCache
 from .solution_encoding import PriorityVectorEncoding
 
 
@@ -60,6 +60,7 @@ def run_ga_cluster_head_selection(
         params.dead_energy_threshold_j,
     )
     score_cache: Dict[tuple[int, ...], ObjectiveResult] = {}
+    objective_evaluator = EnergyDelayObjective(RoundObjectiveCache())
 
     def decode(chromosome: np.ndarray) -> List[int]:
         return encoding.decode(chromosome)
@@ -87,6 +88,7 @@ def run_ga_cluster_head_selection(
             candidates,
             cost_normalization,
             positions,
+            objective_evaluator,
         )
         score_cache[solution] = result
         return result.objective_J

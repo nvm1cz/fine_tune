@@ -7,7 +7,12 @@ import numpy as np
 
 from ..cases import SimulationCase
 from ..routing.joint import optimize_route_plan
-from ..objective import CandidateEvaluation, EvaluationContext, ObjectiveResult
+from ..objective import (
+    CandidateEvaluation,
+    EnergyDelayObjective,
+    EvaluationContext,
+    ObjectiveResult,
+)
 from ..routing.planning import assign_members_strongest_rssi
 from ..run_config import TunableParams
 
@@ -338,10 +343,11 @@ def evaluate_solution_result(
     all_candidates: Sequence[int],
     cost_normalization: PaperCostNormalization | None = None,
     positions: np.ndarray | None = None,
+    evaluator: EnergyDelayObjective | None = None,
 ) -> ObjectiveResult:
     return evaluate_complete_solution(
         case, params, distance_matrix, energies, layers, dist_to_sink,
-        solution, all_candidates, cost_normalization, positions
+        solution, all_candidates, cost_normalization, positions, evaluator
     ).objective_result
 
 
@@ -356,6 +362,7 @@ def evaluate_complete_solution(
     all_candidates: Sequence[int],
     cost_normalization: PaperCostNormalization | None = None,
     positions: np.ndarray | None = None,
+    evaluator: EnergyDelayObjective | None = None,
 ) -> CandidateEvaluation:
     del layers, dist_to_sink, cost_normalization
     solution = _normalize_solution(
@@ -396,7 +403,7 @@ def evaluate_complete_solution(
         delay_epsilon_s=float(params.objective_delay_epsilon_s),
         objective_epsilon=float(params.objective_dimensionless_epsilon),
     )
-    return optimize_route_plan(selected, assignment, context)
+    return optimize_route_plan(selected, assignment, context, evaluator)
 
 
 def evaluate_solution_score(

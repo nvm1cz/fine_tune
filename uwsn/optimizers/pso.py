@@ -14,7 +14,7 @@ from .common import (
     _target_cluster_head_count,
     evaluate_solution_result,
 )
-from ..objective import ObjectiveResult
+from ..objective import EnergyDelayObjective, ObjectiveResult, RoundObjectiveCache
 from .solution_encoding import PriorityVectorEncoding
 
 
@@ -61,6 +61,7 @@ def run_pso_cluster_head_selection(
     positions_swarm = rng.uniform(PSO_POSITION_MIN, PSO_POSITION_MAX, size=(pop_size, dims))
     velocities = np.zeros((pop_size, dims), dtype=float)
     score_cache: Dict[tuple[int, ...], ObjectiveResult] = {}
+    objective_evaluator = EnergyDelayObjective(RoundObjectiveCache())
     cost_normalization = _build_paper_cost_normalization(
         distance_matrix,
         energies,
@@ -95,6 +96,7 @@ def run_pso_cluster_head_selection(
             candidates,
             cost_normalization,
             positions,
+            objective_evaluator,
         )
         score_cache[normalized] = result
         return result.objective_J

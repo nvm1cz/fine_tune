@@ -1,5 +1,8 @@
 import unittest
+from contextlib import contextmanager
 from dataclasses import replace
+import os
+from unittest.mock import patch
 
 import numpy as np
 
@@ -7,6 +10,7 @@ from uwsn.objective import (
     CandidateSolution,
     EnergyDelayObjectiveEvaluator,
     EvaluationContext,
+    RoundObjectiveCache,
     expected_attempts_limited,
 )
 from uwsn.cases import SimulationCase
@@ -75,6 +79,86 @@ class EnergyDelayObjectiveTests(unittest.TestCase):
             assignments={0: (0, 1)},
             routes={0: (None,)},
         )
+
+    @staticmethod
+    @contextmanager
+    def environment(name: str, value: str | None):
+        previous = os.environ.get(name)
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+        try:
+            yield
+        finally:
+            if previous is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = previous
+
+    def test_round_link_cache_matches_independent_reference_path(self) -> None:
+        context = self.context()
+        with self.environment("UWSN_DISABLE_LINK_CACHE", "1"):
+            reference = EnergyDelayObjectiveEvaluator().evaluate(
+                self.direct_candidate(), context
+            )
+        cache = RoundObjectiveCache()
+        optimized_evaluator = EnergyDelayObjectiveEvaluator(cache)
+        first = optimized_evaluator.evaluate(self.direct_candidate(), context)
+        second = optimized_evaluator.evaluate(self.direct_candidate(), context)
+        self.assertEqual(reference.objective_J, first.objective_J)
+        self.assertEqual(reference.raw_energy_j, first.raw_energy_j)
+        self.assertEqual(reference.raw_average_delay_s, first.raw_average_delay_s)
+        self.assertEqual(first.objective_J, second.objective_J)
+        self.assertEqual(cache.stats.logical_objective_evaluations, 2)
+        self.assertEqual(cache.stats.physical_objective_computations, 2)
+        self.assertGreater(cache.stats.link_cache_hits, 0)
+        self.assertGreater(cache.stats.link_cache_misses, 0)
+
+    def test_shadow_mode_compares_every_cached_lookup_to_reference(self) -> None:
+        with self.environment("UWSN_VERIFY_LINK_CACHE", "1"):
+            cache = RoundObjectiveCache()
+            result = EnergyDelayObjectiveEvaluator(cache).evaluate(
+                self.direct_candidate(), self.context()
+            )
+        self.assertTrue(result.is_feasible)
+        self.assertGreater(cache.stats.shadow_checks, 0)
+
+    def test_disable_cache_uses_independent_scalar_reference_path(self) -> None:
+        with self.environment("UWSN_DISABLE_LINK_CACHE", "1"), patch(
+            "uwsn.objective.channel_quality_with_static_environment"
+        ) as optimized_channel:
+            result = EnergyDelayObjectiveEvaluator().evaluate(
+                self.direct_candidate(), self.context()
+            )
+        self.assertTrue(result.is_feasible)
+        optimized_channel.assert_not_called()
+
+    def test_cache_invalidates_when_topology_or_params_change(self) -> None:
+        cache = RoundObjectiveCache()
+        evaluator = EnergyDelayObjectiveEvaluator(cache)
+        near = evaluator.evaluate(
+            self.direct_candidate(),
+            self.context(positions=np.asarray([[90.0, 0.0, 0.0]])),
+        )
+        far = evaluator.evaluate(
+            self.direct_candidate(),
+            self.context(positions=np.asarray([[0.0, 0.0, 0.0]])),
+        )
+        high_power = evaluator.evaluate(
+            self.direct_candidate(),
+            self.context(params=replace(self.params, transmit_power_p0=10.0)),
+        )
+        self.assertGreater(far.raw_average_delay_s, near.raw_average_delay_s)
+        self.assertGreater(high_power.raw_energy_j, far.raw_energy_j)
+
+    def test_objective_cache_does_not_consume_rng_state(self) -> None:
+        rng = np.random.default_rng(2026)
+        before = rng.bit_generator.state
+        evaluator = EnergyDelayObjectiveEvaluator(RoundObjectiveCache())
+        evaluator.evaluate(self.direct_candidate(), self.context())
+        after = rng.bit_generator.state
+        self.assertEqual(before, after)
 
     def test_weights_must_sum_to_one(self) -> None:
         with self.assertRaises(ValueError):

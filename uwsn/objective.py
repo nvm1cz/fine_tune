@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field, replace
 from typing import Mapping, Protocol
 
 import numpy as np
 
-from .models.channel import channel_quality
+from .models.channel import (
+    StaticChannelEnvironment,
+    build_static_channel_environment,
+    channel_quality,
+    channel_quality_with_static_environment,
+)
 from .models.delay import link_delay_s
 from .models.energy import aggregation_energy_j, receive_energy_j, transmit_energy_j
 from .routing.planning import RoutePlan
@@ -76,6 +82,118 @@ class LinkExpectedCost:
     ber: float
     per: float
     transmission_loss_db: float
+
+
+@dataclass(frozen=True)
+class BaseLinkExpectedCost:
+    """Candidate-independent per-packet/per-attempt cost for one round link."""
+
+    source_id: int
+    destination_id: int | None
+    distance_m: float
+    packet_success_probability: float
+    limited_success_probability: float
+    expected_attempts: float
+    transmit_energy_j: float
+    receive_energy_j: float
+    attempt_delay_s: float
+    expected_delay_s: float
+    snr_db: float
+    ber: float
+    per: float
+    transmission_loss_db: float
+
+
+@dataclass
+class ObjectiveCacheStats:
+    logical_objective_evaluations: int = 0
+    physical_objective_computations: int = 0
+    static_environment_builds: int = 0
+    link_cache_hits: int = 0
+    link_cache_misses: int = 0
+    shadow_checks: int = 0
+
+
+class RoundObjectiveCache:
+    """Per-optimizer-refresh deterministic cache; never stores candidate totals."""
+
+    def __init__(self) -> None:
+        self.disabled = os.getenv("UWSN_DISABLE_LINK_CACHE") == "1"
+        self.round_link_disabled = (
+            os.getenv("UWSN_DISABLE_ROUND_LINK_CACHE") == "1"
+        )
+        self.verify = os.getenv("UWSN_VERIFY_LINK_CACHE") == "1"
+        self.stats = ObjectiveCacheStats()
+        self._static_key: tuple[object, ...] | None = None
+        self._static_environment: StaticChannelEnvironment | None = None
+        self._links: dict[tuple[int, int | None], BaseLinkExpectedCost] = {}
+        self._bound_key: tuple[object, ...] | None = None
+
+    def prepare(
+        self,
+        context: EvaluationContext,
+        params: TunableParams,
+        positions: np.ndarray,
+        sink: np.ndarray,
+    ) -> None:
+        """Invalidate round data when topology or any model parameter changes."""
+        key = (
+            id(context.node_positions),
+            id(context.sink_position),
+            positions.shape,
+            sink.shape,
+            int(context.packet_bits),
+            float(context.frequency_khz),
+            float(context.bandwidth_hz),
+            int(context.max_retries),
+            tuple(vars(params).items()),
+        )
+        if self._bound_key is not None and self._bound_key != key:
+            self._links.clear()
+            self._static_key = None
+            self._static_environment = None
+        self._bound_key = key
+
+    def static_environment(
+        self, context: EvaluationContext, params: TunableParams
+    ) -> StaticChannelEnvironment:
+        key = (
+            float(context.frequency_khz),
+            float(params.channel_bandwidth_hz),
+            float(params.shipping_noise_factor),
+            float(params.wind_speed_mps),
+            params.noise_model,
+            params.noise_formula_mode,
+        )
+        if self._static_key != key:
+            self._static_environment = build_static_channel_environment(
+                context.frequency_khz, params
+            )
+            self._static_key = key
+            self.stats.static_environment_builds += 1
+        assert self._static_environment is not None
+        return self._static_environment
+
+    def get_link(self, key: LinkKey) -> BaseLinkExpectedCost | None:
+        if self.round_link_disabled:
+            self.stats.link_cache_misses += 1
+            return None
+        value = self._links.get(key)
+        if value is None:
+            self.stats.link_cache_misses += 1
+        else:
+            self.stats.link_cache_hits += 1
+        return value
+
+    def put_link(self, key: LinkKey, value: BaseLinkExpectedCost) -> None:
+        if not self.round_link_disabled:
+            self._links[key] = value
+
+    def snapshot(self) -> dict[str, int]:
+        return {
+            name: int(value)
+            for name, value in vars(self.stats).items()
+        }
 
 
 @dataclass(frozen=True)
@@ -174,11 +292,16 @@ def expected_attempts_limited(
 class EnergyDelayObjective:
     """Side-effect-free normalized multiplicative energy-delay objective."""
 
+    def __init__(self, cache: RoundObjectiveCache | None = None) -> None:
+        self.cache = cache or RoundObjectiveCache()
+
     def evaluate(
         self,
         candidate: CandidateSolution,
         context: EvaluationContext,
     ) -> ObjectiveResult:
+        self.cache.stats.logical_objective_evaluations += 1
+        self.cache.stats.physical_objective_computations += 1
         self._validate_context(context)
         positions = np.asarray(context.node_positions, dtype=float)
         sink = np.asarray(context.sink_position, dtype=float)
@@ -198,6 +321,7 @@ class EnergyDelayObjective:
             channel_bandwidth_hz=float(context.bandwidth_hz),
             max_retries=int(context.max_retries),
         )
+        self.cache.prepare(context, params, positions, sink)
         reasons: list[str] = []
         node_energy = np.zeros_like(residual, dtype=float)
         expected_attempts_by_link: dict[LinkKey, float] = {}
@@ -506,8 +630,8 @@ class EnergyDelayObjective:
             return None
         return probability, delay, links
 
-    @staticmethod
     def _evaluate_link(
+        self,
         source: int,
         destination: int | None,
         positions: np.ndarray,
@@ -518,14 +642,43 @@ class EnergyDelayObjective:
         *,
         include_aggregation: bool,
     ) -> LinkExpectedCost:
+        if self.cache.disabled:
+            return self._evaluate_link_reference(
+                source, destination, positions, sink, context, params, contention,
+                include_aggregation=include_aggregation,
+            )
+        key = (source, destination)
+        base = self.cache.get_link(key)
+        if base is None:
+            base = self._compute_base_link_cached(
+                source, destination, positions, sink, context, params
+            )
+            self.cache.put_link(key, base)
+        link = self._materialize_link(base, context, params, contention, include_aggregation)
+        if self.cache.verify:
+            reference = self._evaluate_link_reference(
+                source, destination, positions, sink, context, params, contention,
+                include_aggregation=include_aggregation,
+            )
+            self._assert_shadow_equal(reference, link)
+            self.cache.stats.shadow_checks += 1
+        return link
+
+    def _compute_base_link_cached(
+        self,
+        source: int,
+        destination: int | None,
+        positions: np.ndarray,
+        sink: np.ndarray,
+        context: EvaluationContext,
+        params: TunableParams,
+    ) -> BaseLinkExpectedCost:
         destination_position = sink if destination is None else positions[destination]
         distance = float(np.linalg.norm(positions[source] - destination_position))
         if params.enable_packet_errors:
-            quality = channel_quality(
-                distance,
-                context.frequency_khz,
-                context.packet_bits,
-                params,
+            environment = self.cache.static_environment(context, params)
+            quality = channel_quality_with_static_environment(
+                distance, context.packet_bits, params, environment
             )
             attempts, limited_success = expected_attempts_limited(
                 quality["packet_success_probability"],
@@ -541,68 +694,136 @@ class EnergyDelayObjective:
                 "transmission_loss_db": 0.0,
             }
             attempts, limited_success = 1.0, 1.0
-        tx = (
-            transmit_energy_j(distance, context.packet_bits, params)
-            * float(contention[source])
-        )
-        rx = (
-            0.0
-            if destination is None
-            else receive_energy_j(context.packet_bits, params) * float(contention[destination])
-        )
-        aggregation = (
-            limited_success
-            * aggregation_energy_j(context.packet_bits, params)
-            * float(contention[destination])
-            if include_aggregation
-            else 0.0
-        )
-        expected_energy = attempts * (tx + rx) + aggregation
+        tx = transmit_energy_j(distance, context.packet_bits, params)
+        rx = 0.0 if destination is None else receive_energy_j(context.packet_bits, params)
         delay = link_delay_s(
-            context.packet_bits,
-            distance,
-            params,
+            context.packet_bits, distance, params,
             channel_capacity_bps=quality.get("channel_capacity_bps"),
         )
         attempt_delay = (
-            delay.transmission_s
-            + delay.reception_s
-            + delay.propagation_s
-            + delay.byte_alignment_s
-            + delay.holding_s
+            delay.transmission_s + delay.reception_s + delay.propagation_s
+            + delay.byte_alignment_s + delay.holding_s
         )
-        expected_delay = attempts * attempt_delay
+        return BaseLinkExpectedCost(
+            source, destination, distance, quality["packet_success_probability"],
+            limited_success, attempts, tx, rx, attempt_delay,
+            attempts * attempt_delay, quality["snr_db"], quality["ber"],
+            quality["per"], quality["transmission_loss_db"],
+        )
+
+    @staticmethod
+    def _materialize_link(
+        base: BaseLinkExpectedCost,
+        context: EvaluationContext,
+        params: TunableParams,
+        contention: np.ndarray,
+        include_aggregation: bool,
+    ) -> LinkExpectedCost:
+        tx = base.transmit_energy_j * float(contention[base.source_id])
+        rx = (
+            0.0 if base.destination_id is None
+            else base.receive_energy_j * float(contention[base.destination_id])
+        )
+        aggregation = (
+            base.limited_success_probability
+            * aggregation_energy_j(context.packet_bits, params)
+            * float(contention[base.destination_id])
+            if include_aggregation
+            else 0.0
+        )
+        expected_energy = base.expected_attempts * (tx + rx) + aggregation
         values = (
-            distance,
-            limited_success,
-            attempts,
+            base.distance_m,
+            base.limited_success_probability,
+            base.expected_attempts,
             tx,
             rx,
             aggregation,
             expected_energy,
-            attempt_delay,
-            expected_delay,
+            base.attempt_delay_s,
+            base.expected_delay_s,
         )
         if not all(np.isfinite(value) for value in values):
             raise ValueError(f"non-finite link cost for {source}->{destination}")
         return LinkExpectedCost(
-            source_id=source,
-            destination_id=destination,
-            distance_m=distance,
-            packet_success_probability=quality["packet_success_probability"],
-            limited_success_probability=limited_success,
-            expected_attempts=attempts,
+            source_id=base.source_id,
+            destination_id=base.destination_id,
+            distance_m=base.distance_m,
+            packet_success_probability=base.packet_success_probability,
+            limited_success_probability=base.limited_success_probability,
+            expected_attempts=base.expected_attempts,
             transmit_energy_j=tx,
             receive_energy_j=rx,
             aggregation_energy_j=aggregation,
             expected_energy_j=expected_energy,
-            attempt_delay_s=attempt_delay,
-            expected_delay_s=expected_delay,
-            snr_db=quality["snr_db"],
-            ber=quality["ber"],
-            per=quality["per"],
-            transmission_loss_db=quality["transmission_loss_db"],
+            attempt_delay_s=base.attempt_delay_s,
+            expected_delay_s=base.expected_delay_s,
+            snr_db=base.snr_db,
+            ber=base.ber,
+            per=base.per,
+            transmission_loss_db=base.transmission_loss_db,
         )
+
+    @staticmethod
+    def _evaluate_link_reference(
+        source: int,
+        destination: int | None,
+        positions: np.ndarray,
+        sink: np.ndarray,
+        context: EvaluationContext,
+        params: TunableParams,
+        contention: np.ndarray,
+        *,
+        include_aggregation: bool,
+    ) -> LinkExpectedCost:
+        destination_position = sink if destination is None else positions[destination]
+        distance = float(np.linalg.norm(positions[source] - destination_position))
+        if params.enable_packet_errors:
+            quality = channel_quality(distance, context.frequency_khz, context.packet_bits, params)
+            attempts, limited_success = expected_attempts_limited(
+                quality["packet_success_probability"],
+                context.max_retries if params.enable_retransmission else 0,
+                context.normalization_epsilon,
+            )
+        else:
+            quality = {
+                "packet_success_probability": 1.0, "snr_db": float("inf"),
+                "ber": 0.0, "per": 0.0, "transmission_loss_db": 0.0,
+            }
+            attempts, limited_success = 1.0, 1.0
+        tx = transmit_energy_j(distance, context.packet_bits, params) * float(contention[source])
+        rx = 0.0 if destination is None else (
+            receive_energy_j(context.packet_bits, params) * float(contention[destination])
+        )
+        aggregation = (
+            limited_success * aggregation_energy_j(context.packet_bits, params)
+            * float(contention[destination]) if include_aggregation else 0.0
+        )
+        expected_energy = attempts * (tx + rx) + aggregation
+        delay = link_delay_s(
+            context.packet_bits, distance, params,
+            channel_capacity_bps=quality.get("channel_capacity_bps"),
+        )
+        attempt_delay = (
+            delay.transmission_s + delay.reception_s + delay.propagation_s
+            + delay.byte_alignment_s + delay.holding_s
+        )
+        return LinkExpectedCost(
+            source, destination, distance, quality["packet_success_probability"],
+            limited_success, attempts, tx, rx, aggregation, expected_energy,
+            attempt_delay, attempts * attempt_delay, quality["snr_db"],
+            quality["ber"], quality["per"], quality["transmission_loss_db"],
+        )
+
+    @staticmethod
+    def _assert_shadow_equal(reference: LinkExpectedCost, cached: LinkExpectedCost) -> None:
+        for name in reference.__dataclass_fields__:
+            left, right = getattr(reference, name), getattr(cached, name)
+            if isinstance(left, float):
+                if not np.isclose(left, right, rtol=1e-13, atol=1e-15, equal_nan=True):
+                    raise AssertionError(f"link cache mismatch for {name}: {left!r} != {right!r}")
+            elif left != right:
+                raise AssertionError(f"link cache mismatch for {name}: {left!r} != {right!r}")
 
     @staticmethod
     def _record_link(
