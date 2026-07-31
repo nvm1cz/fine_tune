@@ -193,6 +193,21 @@ class JointRoutingTests(unittest.TestCase):
             result.solution.route_plan.diagnostics["plans_evaluated"],
             counters["route_plans_evaluated"],
         )
+        self.assertEqual(counters["outer_ch_candidates"], 1)
+        self.assertEqual(counters["unique_ch_sets"], 1)
+        self.assertGreaterEqual(
+            counters["route_plans_generated"],
+            counters["route_plans_evaluated"],
+        )
+        self.assertEqual(counters["fixed_assignment_computations"], 1)
+        self.assertEqual(
+            counters["route_dependent_computations"],
+            counters["route_plans_evaluated"],
+        )
+        self.assertLess(
+            counters["member_link_evaluations"],
+            counters["route_plans_evaluated"] * 2,
+        )
 
     def test_execution_uses_stored_route_without_greedy_rebuild(self) -> None:
         plan = RoutePlan.from_routes({0: (None,)})

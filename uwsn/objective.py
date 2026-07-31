@@ -132,6 +132,15 @@ class ObjectiveCacheStats:
     route_plans_evaluated: int = 0
     route_plans_max: int = 0
     route_search_limit_hits: int = 0
+    outer_ch_candidates: int = 0
+    unique_ch_sets: int = 0
+    route_plans_generated: int = 0
+    unique_route_plans: int = 0
+    repeated_route_plans: int = 0
+    fixed_assignment_computations: int = 0
+    route_dependent_computations: int = 0
+    member_link_evaluations: int = 0
+    ch_routing_link_evaluations: int = 0
     objective_evaluation_seconds: float = 0.0
     route_construction_seconds: float = 0.0
     neighbor_contention_seconds: float = 0.0
@@ -153,6 +162,8 @@ class RoundObjectiveCache:
         self._links: dict[tuple[int, int | None], BaseLinkExpectedCost] = {}
         self._bound_key: tuple[object, ...] | None = None
         self._topology: RoundTopologyValues | None = None
+        self._seen_ch_sets: set[tuple[int, ...]] = set()
+        self._seen_route_plans: set[str] = set()
 
     def prepare(
         self,
@@ -269,6 +280,20 @@ class RoundObjectiveCache:
         self.stats.route_plans_max = max(self.stats.route_plans_max, int(evaluated))
         if int(evaluated) >= int(limit):
             self.stats.route_search_limit_hits += 1
+
+    def record_outer_ch_candidate(self, selected: tuple[int, ...]) -> None:
+        self.stats.outer_ch_candidates += 1
+        if selected not in self._seen_ch_sets:
+            self._seen_ch_sets.add(selected)
+            self.stats.unique_ch_sets += 1
+
+    def record_generated_route_plan(self, plan_id: str) -> None:
+        self.stats.route_plans_generated += 1
+        if plan_id in self._seen_route_plans:
+            self.stats.repeated_route_plans += 1
+        else:
+            self._seen_route_plans.add(plan_id)
+            self.stats.unique_route_plans += 1
 
     def record_route_seconds(self, started: float) -> None:
         if self.profile:
@@ -424,10 +449,13 @@ class EnergyDelayObjective:
         self,
         candidate: CandidateSolution,
         context: EvaluationContext,
+        *,
+        fixed_member_links: Mapping[tuple[int, int], LinkExpectedCost] | None = None,
     ) -> ObjectiveResult:
         evaluation_started = time.perf_counter() if self.cache.profile else 0.0
         self.cache.stats.logical_objective_evaluations += 1
         self.cache.stats.physical_objective_computations += 1
+        self.cache.stats.route_dependent_computations += 1
         self._validate_context(context)
         positions = np.asarray(context.node_positions, dtype=float)
         sink = np.asarray(context.sink_position, dtype=float)
@@ -553,16 +581,23 @@ class EnergyDelayObjective:
                             f"link exceeds transmission range: {source}->{ch}"
                         )
                         continue
-                    member_link = self._evaluate_link(
-                        source,
-                        ch,
-                        positions,
-                        sink,
-                        context,
-                        params,
-                        contention,
-                        include_aggregation=True,
+                    member_link = (
+                        fixed_member_links.get((source, ch))
+                        if fixed_member_links is not None
+                        else None
                     )
+                    if member_link is None:
+                        self.cache.stats.member_link_evaluations += 1
+                        member_link = self._evaluate_link(
+                            source,
+                            ch,
+                            positions,
+                            sink,
+                            context,
+                            params,
+                            contention,
+                            include_aggregation=True,
+                        )
                     raw_energy += self._record_link(
                         member_link,
                         node_energy,
@@ -676,6 +711,67 @@ class EnergyDelayObjective:
             )
         return result
 
+    def prepare_fixed_member_links(
+        self,
+        selected: tuple[int, ...],
+        assignments: Mapping[int, tuple[int, ...]],
+        context: EvaluationContext,
+    ) -> dict[tuple[int, int], LinkExpectedCost]:
+        """Precompute only member links invariant across route plans.
+
+        Energy accumulation and diagnostics remain inside ``evaluate`` so their
+        floating-point order is unchanged.
+        """
+        self.cache.stats.fixed_assignment_computations += 1
+        positions = np.asarray(context.node_positions, dtype=float)
+        sink = np.asarray(context.sink_position, dtype=float)
+        residual = np.asarray(context.residual_energy_j, dtype=float)
+        params = replace(
+            context.params,
+            acoustic_frequency_khz=float(context.frequency_khz),
+            channel_bandwidth_hz=float(context.bandwidth_hz),
+            max_retries=int(context.max_retries),
+        )
+        self.cache.prepare(context, params, positions, sink)
+        if self.cache.disabled:
+            pairwise = positions[:, None, :] - positions[None, :, :]
+            neighbor_count = np.count_nonzero(
+                np.linalg.norm(pairwise, axis=2) <= params.transmission_range_m,
+                axis=1,
+            ) - 1
+            contention = contention_multiplier(params, neighbor_count)
+        else:
+            contention = self.cache.topology(
+                positions, sink, params
+            ).contention_multiplier
+        links: dict[tuple[int, int], LinkExpectedCost] = {}
+        for ch in selected:
+            members = tuple(int(node) for node in assignments.get(ch, ()))
+            for source in tuple(dict.fromkeys(members)):
+                if source == ch:
+                    continue
+                if not self._valid_node(source, len(residual)):
+                    continue
+                if residual[source] <= params.dead_energy_threshold_j:
+                    continue
+                if (
+                    float(np.linalg.norm(positions[source] - positions[ch]))
+                    > params.transmission_range_m
+                ):
+                    continue
+                self.cache.stats.member_link_evaluations += 1
+                links[(source, ch)] = self._evaluate_link(
+                    source,
+                    ch,
+                    positions,
+                    sink,
+                    context,
+                    params,
+                    contention,
+                    include_aggregation=True,
+                )
+        return links
+
     @staticmethod
     def _validate_context(context: EvaluationContext) -> None:
         values = (
@@ -750,6 +846,7 @@ class EnergyDelayObjective:
                     f"link exceeds transmission range: {current}->{destination}"
                 )
                 return None
+            self.cache.stats.ch_routing_link_evaluations += 1
             link = self._evaluate_link(
                 current, destination, positions, sink, context, params, contention,
                 include_aggregation=False

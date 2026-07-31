@@ -158,6 +158,7 @@ def optimize_route_plan(
         return value
 
     selected = tuple(sorted(dict.fromkeys(int(ch) for ch in selected_cluster_heads)))
+    evaluator.cache.record_outer_ch_candidate(selected)
     if not assignment.is_feasible:
         solution = CandidateSolution(selected, assignment.assignments, {})
         result = infeasible_objective(assignment.invalid_reason or "unassigned_alive_node")
@@ -180,6 +181,9 @@ def optimize_route_plan(
         else evaluator.cache.topology(positions, sink, params)
     )
     predicted = predict_post_assignment_energy(assignment, context, evaluator)
+    fixed_member_links = evaluator.prepare_fixed_member_links(
+        selected, assignment.assignments, context
+    )
     options: dict[int, tuple[int | None, ...]] = {}
     for ch in selected:
         choices: list[int | None] = []
@@ -237,6 +241,7 @@ def optimize_route_plan(
             break
         parents = dict(zip(selected, combination))
         plan = _routes_from_parents(selected, parents)
+        evaluator.cache.record_generated_route_plan(plan.plan_id)
         if not plan.is_feasible:
             continue
         solution = CandidateSolution(
@@ -245,7 +250,9 @@ def optimize_route_plan(
             plan.route_by_ch,
             plan,
         )
-        result = evaluator.evaluate(solution, context)
+        result = evaluator.evaluate(
+            solution, context, fixed_member_links=fixed_member_links
+        )
         evaluated += 1
         candidate = CandidateEvaluation(
             solution, result, result.is_feasible, result.invalid_reason

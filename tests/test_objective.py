@@ -176,6 +176,23 @@ class EnergyDelayObjectiveTests(unittest.TestCase):
         after = rng.bit_generator.state
         self.assertEqual(before, after)
 
+    def test_fixed_member_link_decomposition_is_exact(self) -> None:
+        candidate = self.direct_candidate()
+        context = self.context()
+        reference = EnergyDelayObjectiveEvaluator().evaluate(candidate, context)
+        evaluator = EnergyDelayObjectiveEvaluator()
+        fixed = evaluator.prepare_fixed_member_links(
+            candidate.selected_cluster_heads,
+            candidate.assignments,
+            context,
+        )
+        decomposed = evaluator.evaluate(
+            candidate,
+            context,
+            fixed_member_links=fixed,
+        )
+        self.assertEqual(reference, decomposed)
+
     def test_weights_must_sum_to_one(self) -> None:
         with self.assertRaises(ValueError):
             self.evaluator.evaluate(
