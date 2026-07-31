@@ -36,6 +36,19 @@ def main() -> None:
         "--checkpoint-dataset",
         help="Kaggle Dataset handle used for cross-session checkpointing.",
     )
+    parser.add_argument(
+        "--stage",
+        choices=("screen", "refine", "validate"),
+        help="Run only one successive-halving stage.",
+    )
+    parser.add_argument("--config-start", type=int, default=0)
+    parser.add_argument("--config-end", type=int)
+    parser.add_argument("--max-wall-time-seconds", type=int)
+    parser.add_argument(
+        "--resume-from",
+        type=Path,
+        help="Directory containing a compatible manifest and trials.jsonl.",
+    )
     args = parser.parse_args()
     checkpoint = (
         KaggleDatasetCheckpoint(args.checkpoint_dataset)
@@ -47,6 +60,11 @@ def main() -> None:
         args.config, args.output_dir, workers=args.workers,
         execute=args.execute, smoke=args.smoke, algorithm_id=args.algorithm,
         checkpoint_callback=checkpoint.publish if checkpoint is not None else None,
+        stage_name=args.stage,
+        config_start=args.config_start,
+        config_end=args.config_end,
+        max_wall_time_seconds=args.max_wall_time_seconds,
+        resume_from=args.resume_from,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
 

@@ -7,9 +7,11 @@ import json
 import math
 import os
 import random
+import shutil
 import statistics
+import subprocess
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -20,6 +22,7 @@ from .experiment_config.runner import build_simulator
 
 
 TUNED_ALGORITHMS = ("eulc_pso", "eulc_ga", "eulc_ac_aco")
+TUNING_CHECKPOINT_SCHEMA = 2
 
 
 def stable_hash(value: Any, length: int = 12) -> str:
@@ -267,6 +270,100 @@ def _append_durable_jsonl(path: Path, row: dict[str, Any]) -> None:
         os.fsync(handle.fileno())
 
 
+def _atomic_write_json(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8") as handle:
+        json.dump(value, handle, indent=2, ensure_ascii=False)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    temporary.replace(path)
+
+
+def _repository_commit(root: Path) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def _trial_key(identity: dict[str, Any]) -> str:
+    return "|".join(
+        (
+            str(identity["algorithm_id"]),
+            str(identity["stage"]),
+            str(identity["trial_config_hash"]),
+            str(identity.get("scenario", identity["case_id"])),
+            str(identity["base_seed"]),
+        )
+    )
+
+
+def _read_results(path: Path) -> dict[str, dict[str, Any]]:
+    results: dict[str, dict[str, Any]] = {}
+    if not path.exists():
+        return results
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        key = row.get("trial_key")
+        if key is None:
+            key = _trial_key(row)
+            row["trial_key"] = key
+        previous = results.get(key)
+        if (
+            previous is not None
+            and previous.get("status") == "completed"
+            and row.get("status") == "completed"
+            and previous != row
+        ):
+            raise ValueError(
+                f"conflicting completed trial at {path}:{line_number}: {key}"
+            )
+        results[key] = row
+    return results
+
+
+def _read_rankings(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        raise ValueError(f"required prior-stage ranking is missing: {path}")
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _promote_candidates(
+    candidates: dict[str, list[dict[str, Any]]],
+    rankings: list[dict[str, Any]],
+    selected_algorithms: tuple[str, ...],
+    keep: int,
+) -> dict[str, list[dict[str, Any]]]:
+    promoted: dict[str, list[dict[str, Any]]] = {}
+    for selected_id in selected_algorithms:
+        ordered_ids = [
+            row["trial_id"]
+            for row in rankings
+            if row["algorithm_id"] == selected_id
+        ][: int(keep)]
+        wanted = set(ordered_ids)
+        promoted[selected_id] = [
+            trial for trial in candidates[selected_id]
+            if trial["trial_id"] in wanted
+        ]
+        if len(promoted[selected_id]) != len(ordered_ids):
+            raise ValueError(
+                f"prior-stage ranking does not match generated configs for {selected_id}"
+            )
+    return promoted
+
+
 def _publish_progress(
     output_dir: Path,
     *,
@@ -331,14 +428,31 @@ def run_tuning(
     smoke: bool = False,
     algorithm_id: str | None = None,
     checkpoint_callback: Callable[[Path, str], None] | None = None,
+    stage_name: str | None = None,
+    config_start: int = 0,
+    config_end: int | None = None,
+    max_wall_time_seconds: int | None = None,
+    resume_from: Path | None = None,
+    trial_runner: Callable[[dict[str, Any]], dict[str, Any]] = _run_trial_job,
 ) -> dict[str, Any]:
     root = spec_path.resolve().parents[2]
     spec = load_yaml(spec_path)
+    spec_hash = stable_hash(spec, length=64)
+    git_commit = _repository_commit(root)
     all_cases = ExperimentGenerator(root / spec["experiment_set"]).build_cases()
     candidate_count = 1 if smoke else int(spec["candidates_per_algorithm"])
     stages = copy.deepcopy(spec["stages"])
     if smoke:
         stages = [{"name": "smoke", "rounds": 2, "seeds": [0], "keep": 1}]
+    stage_names = [str(stage["name"]) for stage in stages]
+    if stage_name is not None and stage_name not in stage_names:
+        raise ValueError(f"unknown tuning stage: {stage_name}")
+    if config_start < 0:
+        raise ValueError("config_start must be non-negative")
+    if config_end is not None and config_end < config_start:
+        raise ValueError("config_end must be greater than or equal to config_start")
+    if max_wall_time_seconds is not None and max_wall_time_seconds <= 0:
+        raise ValueError("max_wall_time_seconds must be positive")
     selected_algorithms = (
         (algorithm_id,) if algorithm_id is not None else TUNED_ALGORITHMS
     )
@@ -393,132 +507,284 @@ def run_tuning(
         return plan
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    if resume_from is not None:
+        source = resume_from.resolve()
+        if not source.is_dir():
+            raise ValueError("resume_from must be a checkpoint directory")
+        if source != output_dir.resolve():
+            for name in (
+                "trials.jsonl",
+                "manifest.json",
+                "progress.json",
+                "progress.log",
+                "rankings_screen.csv",
+                "rankings_refine.csv",
+                "rankings_validate.csv",
+                "rankings_all_stages.csv",
+                "best_summary.json",
+            ):
+                candidate = source / name
+                if candidate.exists():
+                    shutil.copy2(candidate, output_dir / name)
+            for candidate in source.glob("best_config_*.yaml"):
+                shutil.copy2(candidate, output_dir / candidate.name)
+
+    manifest_path = output_dir / "manifest.json"
+    if manifest_path.exists():
+        previous_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if previous_manifest.get("schema_version") != TUNING_CHECKPOINT_SCHEMA:
+            raise ValueError("checkpoint schema version does not match")
+        if previous_manifest.get("spec_hash") != spec_hash:
+            raise ValueError("checkpoint tuning config does not match")
+        if previous_manifest.get("git_commit") != git_commit:
+            raise ValueError("checkpoint git commit does not match")
+        if previous_manifest.get("algorithms") != list(selected_algorithms):
+            raise ValueError("checkpoint algorithm selection does not match")
+
     results_path = output_dir / "trials.jsonl"
-    existing: dict[tuple[str, str, str], dict[str, Any]] = {}
-    if results_path.exists():
-        for line in results_path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                row = json.loads(line)
-                existing[(row["stage"], row["trial_id"], row["case_id"])] = row
+    existing = _read_results(results_path)
+    campaign_started = time.perf_counter()
+    manifest: dict[str, Any] = {
+        **plan,
+        "schema_version": TUNING_CHECKPOINT_SCHEMA,
+        "spec_hash": spec_hash,
+        "git_commit": git_commit,
+        "requested_stage": stage_name,
+        "config_start": int(config_start),
+        "config_end": config_end,
+        "max_wall_time_seconds": max_wall_time_seconds,
+        "completed": False,
+        "stop_reason": None,
+        "completed_trial_keys": sum(
+            row.get("status") == "completed" for row in existing.values()
+        ),
+    }
+    _atomic_write_json(manifest_path, manifest)
 
     all_stage_rankings: list[dict[str, Any]] = []
     overall_total = sum(int(stage["planned_runs"]) for stage in plan["stages"])
-    overall_done = 0
-    for stage in stages:
+    overall_done = sum(
+        row.get("status") == "completed" for row in existing.values()
+    )
+    stopped_for_time = False
+    ran_requested_stage = False
+    for stage_index, stage in enumerate(stages):
+        current_stage = str(stage["name"])
+        if stage_name is not None and current_stage != stage_name:
+            if stage_names.index(stage_name) > stage_index:
+                prior_rankings = _read_rankings(
+                    output_dir / f"rankings_{current_stage}.csv"
+                )
+                candidates = _promote_candidates(
+                    candidates,
+                    prior_rankings,
+                    selected_algorithms,
+                    int(stage["keep"]),
+                )
+                for row in prior_rankings:
+                    row["stage"] = current_stage
+                all_stage_rankings.extend(prior_rankings)
+            continue
+        ran_requested_stage = True
         stage_started = time.perf_counter()
         stage_cases = select_stage_cases(all_cases, spec["scenario_filter"], stage["seeds"])
-        jobs = []
-        stage_rows = []
-        for algorithm_id, trial_configs in candidates.items():
+        all_jobs: list[dict[str, Any]] = []
+        selected_job_keys: set[str] = set()
+        for selected_id, trial_configs in candidates.items():
+            sliced_configs = trial_configs[config_start:config_end]
+            selected_hashes = {trial["config_hash"] for trial in sliced_configs}
             for trial in trial_configs:
                 for case in stage_cases:
                     identity = {
-                        "stage": stage["name"], "algorithm_id": algorithm_id,
+                        "stage": current_stage, "algorithm_id": selected_id,
                         "trial_id": trial["trial_id"],
                         "trial_config_hash": trial["config_hash"],
                         "case_id": case["metadata"]["case_id"],
+                        "scenario": case["metadata"]["case_id"],
                         "case_config_hash": case["metadata"]["config_hash"],
                         "base_seed": case["metadata"]["base_seed"],
                         "distribution": case["environment"]["distribution"],
                     }
-                    key = (identity["stage"], identity["trial_id"], identity["case_id"])
-                    if key in existing and existing[key]["status"] == "completed":
-                        stage_rows.append(existing[key])
-                    else:
-                        jobs.append({
-                            "identity": identity, "case": case,
-                            "algorithm_config": trial["config"], "rounds": stage["rounds"],
-                        })
-        stage_total = len(stage_rows) + len(jobs)
+                    identity["trial_key"] = _trial_key(identity)
+                    job = {
+                        "identity": identity,
+                        "case": case,
+                        "algorithm_config": trial["config"],
+                        "rounds": stage["rounds"],
+                    }
+                    all_jobs.append(job)
+                    if trial["config_hash"] in selected_hashes:
+                        selected_job_keys.add(identity["trial_key"])
+        stage_key_order = [job["identity"]["trial_key"] for job in all_jobs]
+        stage_keys = set(stage_key_order)
+        stage_rows = [
+            existing[key]
+            for key in stage_key_order
+            if key in existing and existing[key].get("status") == "completed"
+        ]
+        jobs = [
+            job
+            for job in all_jobs
+            if job["identity"]["trial_key"] in selected_job_keys
+            and (
+                job["identity"]["trial_key"] not in existing
+                or existing[job["identity"]["trial_key"]].get("status") != "completed"
+            )
+        ]
+        stage_total = len(stage_keys)
         stage_done = len(stage_rows)
-        overall_done += stage_done
         _publish_progress(
-            output_dir, stage=stage["name"],
+            output_dir, stage=current_stage,
             stage_done=stage_done, stage_total=stage_total,
             overall_done=overall_done, overall_total=overall_total,
             latest=None, stage_started=stage_started,
         )
-        if int(workers) <= 1:
-            for job in jobs:
-                row = _run_trial_job(job)
-                stage_rows.append(row)
-                _append_durable_jsonl(results_path, row)
+
+        completed_runtimes = [
+            float(row.get("runtime_seconds", 0.0))
+            for row in stage_rows
+            if float(row.get("runtime_seconds", 0.0)) > 0.0
+        ]
+
+        def can_start_trial() -> bool:
+            if max_wall_time_seconds is None:
+                return True
+            elapsed = time.perf_counter() - campaign_started
+            estimate = max(completed_runtimes, default=30.0)
+            return elapsed + estimate < float(max_wall_time_seconds)
+
+        def record(row: dict[str, Any]) -> None:
+            nonlocal stage_done, overall_done
+            key = str(row["trial_key"])
+            existing[key] = row
+            _append_durable_jsonl(results_path, row)
+            completed_runtimes.append(float(row.get("runtime_seconds", 0.0)))
+            if row.get("status") == "completed":
                 stage_done += 1
                 overall_done += 1
-                _publish_progress(
-                    output_dir, stage=stage["name"],
-                    stage_done=stage_done, stage_total=stage_total,
-                    overall_done=overall_done, overall_total=overall_total,
-                    latest=row, stage_started=stage_started,
+                stage_rows.append(row)
+            manifest["completed_trial_keys"] = sum(
+                value.get("status") == "completed" for value in existing.values()
+            )
+            manifest["active_stage"] = current_stage
+            manifest["stage_completed"] = stage_done
+            manifest["stage_total"] = stage_total
+            _atomic_write_json(manifest_path, manifest)
+            _publish_progress(
+                output_dir,
+                stage=current_stage,
+                stage_done=stage_done,
+                stage_total=stage_total,
+                overall_done=overall_done,
+                overall_total=overall_total,
+                latest=row,
+                stage_started=stage_started,
+            )
+            if checkpoint_callback is not None:
+                checkpoint_callback(
+                    output_dir, f"{current_stage} {stage_done}/{stage_total}"
                 )
-                if checkpoint_callback is not None:
-                    checkpoint_callback(
-                        output_dir,
-                        f"{stage['name']} {stage_done}/{stage_total}",
-                    )
-        else:
-            with ProcessPoolExecutor(max_workers=int(workers)) as executor:
-                futures = [executor.submit(_run_trial_job, job) for job in jobs]
-                for future in as_completed(futures):
-                    row = future.result()
-                    stage_rows.append(row)
-                    _append_durable_jsonl(results_path, row)
-                    stage_done += 1
-                    overall_done += 1
-                    _publish_progress(
-                        output_dir, stage=stage["name"],
-                        stage_done=stage_done, stage_total=stage_total,
-                        overall_done=overall_done, overall_total=overall_total,
-                        latest=row, stage_started=stage_started,
-                    )
-                    if checkpoint_callback is not None:
-                        checkpoint_callback(
-                            output_dir,
-                            f"{stage['name']} {stage_done}/{stage_total}",
-                        )
-        rankings = aggregate_rankings(stage_rows, len(stage_cases))
-        for row in rankings:
-            row["stage"] = stage["name"]
-        _write_csv(output_dir / f"rankings_{stage['name']}.csv", rankings)
-        all_stage_rankings.extend(rankings)
-        promoted: dict[str, list[dict[str, Any]]] = {}
-        for algorithm_id in selected_algorithms:
-            keep_ids = {
-                row["trial_id"] for row in rankings
-                if row["algorithm_id"] == algorithm_id
-            }
-            ordered_ids = [
-                row["trial_id"] for row in rankings
-                if row["algorithm_id"] == algorithm_id
-            ][: int(stage["keep"])]
-            promoted[algorithm_id] = [
-                trial for trial in candidates[algorithm_id]
-                if trial["trial_id"] in set(ordered_ids) & keep_ids
-            ]
-        candidates = promoted
 
+        if int(workers) <= 1:
+            for job in jobs:
+                if not can_start_trial():
+                    stopped_for_time = True
+                    break
+                record(trial_runner(job))
+        else:
+            job_iterator = iter(jobs)
+            with ProcessPoolExecutor(max_workers=int(workers)) as executor:
+                pending: dict[Any, dict[str, Any]] = {}
+                while len(pending) < int(workers) and can_start_trial():
+                    try:
+                        job = next(job_iterator)
+                    except StopIteration:
+                        break
+                    pending[executor.submit(trial_runner, job)] = job
+                while pending:
+                    done, _ = wait(tuple(pending), return_when=FIRST_COMPLETED)
+                    for future in done:
+                        pending.pop(future)
+                        record(future.result())
+                    while len(pending) < int(workers):
+                        if not can_start_trial():
+                            stopped_for_time = True
+                            break
+                        try:
+                            job = next(job_iterator)
+                        except StopIteration:
+                            break
+                        pending[executor.submit(trial_runner, job)] = job
+                    if stopped_for_time and not pending:
+                        break
+
+        stage_complete = all(
+            key in existing and existing[key].get("status") == "completed"
+            for key in stage_keys
+        )
+        if not stage_complete:
+            manifest["completed"] = False
+            manifest["stop_reason"] = (
+                "time_budget" if stopped_for_time else "batch_complete"
+            )
+            manifest["active_stage"] = current_stage
+            manifest["stage_completed"] = sum(
+                key in existing and existing[key].get("status") == "completed"
+                for key in stage_keys
+            )
+            manifest["stage_total"] = stage_total
+            _atomic_write_json(manifest_path, manifest)
+            if checkpoint_callback is not None:
+                checkpoint_callback(
+                    output_dir,
+                    f"{current_stage} stopped: {manifest['stop_reason']}",
+                )
+            return manifest
+
+        rankings = aggregate_rankings(
+            [existing[key] for key in stage_key_order], len(stage_cases)
+        )
+        for row in rankings:
+            row["stage"] = current_stage
+        _write_csv(output_dir / f"rankings_{current_stage}.csv", rankings)
+        all_stage_rankings.extend(rankings)
+        candidates = _promote_candidates(
+            candidates, rankings, selected_algorithms, int(stage["keep"])
+        )
+        manifest["completed_stages"] = [
+            *manifest.get("completed_stages", []),
+            current_stage,
+        ]
+        _atomic_write_json(manifest_path, manifest)
+        if stage_name is not None:
+            break
+
+    if not ran_requested_stage:
+        raise ValueError(f"stage was not run: {stage_name}")
     final_stage = stages[-1]["name"]
     final_rankings = [
         row for row in all_stage_rankings if row["stage"] == final_stage and row["rank"] == 1
     ]
     best_summary = {"tuning_plan": plan, "best": {}}
-    for row in final_rankings:
-        algorithm_id = row["algorithm_id"]
-        trial = next(
-            trial for trial in candidates[algorithm_id]
-            if trial["trial_id"] == row["trial_id"]
-        )
-        write_yaml(output_dir / f"best_config_{algorithm_id.removeprefix('eulc_')}.yaml",
-                   trial["config"])
-        best_summary["best"][algorithm_id] = row
-    (output_dir / "best_summary.json").write_text(
-        json.dumps(best_summary, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    (output_dir / "manifest.json").write_text(
-        json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    if final_rankings:
+        for row in final_rankings:
+            algorithm_id = row["algorithm_id"]
+            trial = next(
+                trial for trial in candidates[algorithm_id]
+                if trial["trial_id"] == row["trial_id"]
+            )
+            write_yaml(
+                output_dir
+                / f"best_config_{algorithm_id.removeprefix('eulc_')}.yaml",
+                trial["config"],
+            )
+            best_summary["best"][algorithm_id] = row
+        _atomic_write_json(output_dir / "best_summary.json", best_summary)
     _write_csv(output_dir / "rankings_all_stages.csv", all_stage_rankings)
+    manifest["completed"] = True
+    manifest["stop_reason"] = None
+    manifest["active_stage"] = stage_name or final_stage
+    _atomic_write_json(manifest_path, manifest)
     if checkpoint_callback is not None:
         checkpoint_callback(output_dir, "tuning completed")
-    return best_summary
+    return best_summary if final_rankings else manifest
