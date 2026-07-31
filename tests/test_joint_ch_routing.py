@@ -174,6 +174,26 @@ class JointRoutingTests(unittest.TestCase):
             self.assertIsNotNone(candidate.route_plan)
             self.assertEqual(set(candidate.assignments), {0, 1})
 
+    def test_route_search_counters_do_not_change_enumeration(self) -> None:
+        assignment = assign_members_strongest_rssi(
+            self.positions, self.energies, (0, 1), self.params
+        )
+        evaluator = EnergyDelayObjective()
+        result = optimize_route_plan(
+            (0, 1), assignment, self.context(), evaluator
+        )
+        counters = evaluator.cache.snapshot()
+        self.assertTrue(result.is_feasible)
+        self.assertEqual(counters["route_outer_candidates"], 1)
+        self.assertGreater(counters["route_plans_evaluated"], 1)
+        self.assertEqual(
+            counters["route_plans_max"], counters["route_plans_evaluated"]
+        )
+        self.assertEqual(
+            result.solution.route_plan.diagnostics["plans_evaluated"],
+            counters["route_plans_evaluated"],
+        )
+
     def test_execution_uses_stored_route_without_greedy_rebuild(self) -> None:
         plan = RoutePlan.from_routes({0: (None,)})
         params = replace(self.params, transmission_range_m=100.0)

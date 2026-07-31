@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass, field, replace
 from typing import Mapping, Protocol
 
@@ -104,6 +105,16 @@ class BaseLinkExpectedCost:
     transmission_loss_db: float
 
 
+@dataclass(frozen=True)
+class RoundTopologyValues:
+    pairwise_distances_m: np.ndarray
+    neighbor_mask: np.ndarray
+    neighbor_count: np.ndarray
+    contention_multiplier: np.ndarray
+    distances_to_sink_m: np.ndarray
+    sink_reachable: np.ndarray
+
+
 @dataclass
 class ObjectiveCacheStats:
     logical_objective_evaluations: int = 0
@@ -112,6 +123,18 @@ class ObjectiveCacheStats:
     link_cache_hits: int = 0
     link_cache_misses: int = 0
     shadow_checks: int = 0
+    neighbor_cache_builds: int = 0
+    neighbor_cache_hits: int = 0
+    neighbor_cache_misses: int = 0
+    contention_cache_hits: int = 0
+    contention_cache_misses: int = 0
+    route_outer_candidates: int = 0
+    route_plans_evaluated: int = 0
+    route_plans_max: int = 0
+    route_search_limit_hits: int = 0
+    objective_evaluation_seconds: float = 0.0
+    route_construction_seconds: float = 0.0
+    neighbor_contention_seconds: float = 0.0
 
 
 class RoundObjectiveCache:
@@ -123,11 +146,13 @@ class RoundObjectiveCache:
             os.getenv("UWSN_DISABLE_ROUND_LINK_CACHE") == "1"
         )
         self.verify = os.getenv("UWSN_VERIFY_LINK_CACHE") == "1"
+        self.profile = os.getenv("UWSN_PROFILE_CACHE") == "1"
         self.stats = ObjectiveCacheStats()
         self._static_key: tuple[object, ...] | None = None
         self._static_environment: StaticChannelEnvironment | None = None
         self._links: dict[tuple[int, int | None], BaseLinkExpectedCost] = {}
         self._bound_key: tuple[object, ...] | None = None
+        self._topology: RoundTopologyValues | None = None
 
     def prepare(
         self,
@@ -138,10 +163,14 @@ class RoundObjectiveCache:
     ) -> None:
         """Invalidate round data when topology or any model parameter changes."""
         key = (
-            id(context.node_positions),
-            id(context.sink_position),
             positions.shape,
             sink.shape,
+            positions.tobytes(),
+            sink.tobytes(),
+            np.packbits(
+                np.asarray(context.residual_energy_j, dtype=float)
+                > params.dead_energy_threshold_j
+            ).tobytes(),
             int(context.packet_bits),
             float(context.frequency_khz),
             float(context.bandwidth_hz),
@@ -152,7 +181,98 @@ class RoundObjectiveCache:
             self._links.clear()
             self._static_key = None
             self._static_environment = None
+            self._topology = None
         self._bound_key = key
+
+    @staticmethod
+    def _build_topology_reference(
+        positions: np.ndarray,
+        sink: np.ndarray,
+        params: TunableParams,
+    ) -> RoundTopologyValues:
+        pairwise = positions[:, None, :] - positions[None, :, :]
+        distances = np.linalg.norm(pairwise, axis=2)
+        neighbor_mask = distances <= params.transmission_range_m
+        neighbor_count = np.count_nonzero(neighbor_mask, axis=1) - 1
+        contention = contention_multiplier(params, neighbor_count)
+        distances_to_sink = np.linalg.norm(positions - sink, axis=1)
+        return RoundTopologyValues(
+            pairwise_distances_m=distances,
+            neighbor_mask=neighbor_mask,
+            neighbor_count=neighbor_count,
+            contention_multiplier=contention,
+            distances_to_sink_m=distances_to_sink,
+            sink_reachable=distances_to_sink <= params.transmission_range_m,
+        )
+
+    @staticmethod
+    def _build_topology_scalar_reference(
+        positions: np.ndarray,
+        sink: np.ndarray,
+        params: TunableParams,
+    ) -> RoundTopologyValues:
+        node_count = positions.shape[0]
+        distances = np.empty((node_count, node_count), dtype=float)
+        for source in range(node_count):
+            for destination in range(node_count):
+                distances[source, destination] = float(
+                    np.linalg.norm(positions[source] - positions[destination])
+                )
+        distances_to_sink = np.asarray(
+            [
+                float(np.linalg.norm(positions[node] - sink))
+                for node in range(node_count)
+            ],
+            dtype=float,
+        )
+        neighbor_mask = distances <= params.transmission_range_m
+        neighbor_count = np.count_nonzero(neighbor_mask, axis=1) - 1
+        return RoundTopologyValues(
+            pairwise_distances_m=distances,
+            neighbor_mask=neighbor_mask,
+            neighbor_count=neighbor_count,
+            contention_multiplier=contention_multiplier(params, neighbor_count),
+            distances_to_sink_m=distances_to_sink,
+            sink_reachable=distances_to_sink <= params.transmission_range_m,
+        )
+
+    def topology(
+        self,
+        positions: np.ndarray,
+        sink: np.ndarray,
+        params: TunableParams,
+    ) -> RoundTopologyValues:
+        started = time.perf_counter() if self.profile else 0.0
+        if self._topology is None:
+            self.stats.neighbor_cache_misses += 1
+            self.stats.contention_cache_misses += 1
+            self._topology = self._build_topology_reference(positions, sink, params)
+            self.stats.neighbor_cache_builds += 1
+        else:
+            self.stats.neighbor_cache_hits += 1
+            self.stats.contention_cache_hits += 1
+        if self.verify:
+            reference = self._build_topology_scalar_reference(positions, sink, params)
+            for name in reference.__dataclass_fields__:
+                if not np.array_equal(
+                    getattr(reference, name), getattr(self._topology, name)
+                ):
+                    raise AssertionError(f"neighbor cache mismatch for {name}")
+            self.stats.shadow_checks += 1
+        if self.profile:
+            self.stats.neighbor_contention_seconds += time.perf_counter() - started
+        return self._topology
+
+    def record_route_search(self, evaluated: int, limit: int) -> None:
+        self.stats.route_outer_candidates += 1
+        self.stats.route_plans_evaluated += int(evaluated)
+        self.stats.route_plans_max = max(self.stats.route_plans_max, int(evaluated))
+        if int(evaluated) >= int(limit):
+            self.stats.route_search_limit_hits += 1
+
+    def record_route_seconds(self, started: float) -> None:
+        if self.profile:
+            self.stats.route_construction_seconds += time.perf_counter() - started
 
     def static_environment(
         self, context: EvaluationContext, params: TunableParams
@@ -189,11 +309,16 @@ class RoundObjectiveCache:
         if not self.round_link_disabled:
             self._links[key] = value
 
-    def snapshot(self) -> dict[str, int]:
-        return {
-            name: int(value)
-            for name, value in vars(self.stats).items()
-        }
+    def snapshot(self) -> dict[str, int | float]:
+        values: dict[str, int | float] = dict(vars(self.stats))
+        outer = self.stats.route_outer_candidates
+        values["average_route_plans_per_outer_candidate"] = (
+            self.stats.route_plans_evaluated / outer if outer else 0.0
+        )
+        values["routing_plan_search_limit_percent"] = (
+            100.0 * self.stats.route_search_limit_hits / outer if outer else 0.0
+        )
+        return values
 
 
 @dataclass(frozen=True)
@@ -300,6 +425,7 @@ class EnergyDelayObjective:
         candidate: CandidateSolution,
         context: EvaluationContext,
     ) -> ObjectiveResult:
+        evaluation_started = time.perf_counter() if self.cache.profile else 0.0
         self.cache.stats.logical_objective_evaluations += 1
         self.cache.stats.physical_objective_computations += 1
         self._validate_context(context)
@@ -331,11 +457,17 @@ class EnergyDelayObjective:
         route_success: dict[int, float] = {}
         packet_delays: dict[int, float] = {}
         raw_energy = 0.0
-        pairwise = positions[:, None, :] - positions[None, :, :]
-        neighbor_count = np.count_nonzero(
-            np.linalg.norm(pairwise, axis=2) <= params.transmission_range_m, axis=1
-        ) - 1
-        contention = contention_multiplier(params, neighbor_count)
+        if self.cache.disabled:
+            pairwise = positions[:, None, :] - positions[None, :, :]
+            neighbor_count = np.count_nonzero(
+                np.linalg.norm(pairwise, axis=2) <= params.transmission_range_m,
+                axis=1,
+            ) - 1
+            contention = contention_multiplier(params, neighbor_count)
+        else:
+            contention = self.cache.topology(
+                positions, sink, params
+            ).contention_multiplier
 
         selected = tuple(int(ch) for ch in candidate.selected_cluster_heads)
         alive = {
@@ -512,7 +644,7 @@ class EnergyDelayObjective:
         else:
             objective = float("inf")
             log_objective = float("inf")
-        return ObjectiveResult(
+        result = ObjectiveResult(
             objective_value=float(objective),
             raw_energy_j=float(raw_energy),
             raw_average_delay_s=raw_delay,
@@ -538,6 +670,11 @@ class EnergyDelayObjective:
             required_packet_count=required_packet_count,
             log_objective=float(log_objective),
         )
+        if self.cache.profile:
+            self.cache.stats.objective_evaluation_seconds += (
+                time.perf_counter() - evaluation_started
+            )
+        return result
 
     @staticmethod
     def _validate_context(context: EvaluationContext) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from itertools import product
+import time
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -39,16 +40,24 @@ def infeasible_objective(reason: str) -> ObjectiveResult:
 def predict_post_assignment_energy(
     assignment: AssignmentResult,
     context: EvaluationContext,
+    evaluator: EnergyDelayObjective | None = None,
 ) -> np.ndarray:
     """Predict energy after member collection without mutating the snapshot."""
     params = context.params
     positions = np.asarray(context.node_positions, dtype=float)
     predicted = np.asarray(context.residual_energy_j, dtype=float).copy()
-    pairwise = positions[:, None, :] - positions[None, :, :]
-    neighbor_count = np.count_nonzero(
-        np.linalg.norm(pairwise, axis=2) <= params.transmission_range_m, axis=1
-    ) - 1
-    contention = contention_multiplier(params, neighbor_count)
+    if evaluator is None or evaluator.cache.disabled:
+        pairwise = positions[:, None, :] - positions[None, :, :]
+        neighbor_count = np.count_nonzero(
+            np.linalg.norm(pairwise, axis=2) <= params.transmission_range_m, axis=1
+        ) - 1
+        contention = contention_multiplier(params, neighbor_count)
+    else:
+        sink = np.asarray(context.sink_position, dtype=float)
+        evaluator.cache.prepare(context, params, positions, sink)
+        contention = evaluator.cache.topology(
+            positions, sink, params
+        ).contention_multiplier
     alive = np.flatnonzero(predicted > params.dead_energy_threshold_j)
     control = aggregation_energy_j(params.broadcast_packet_size_bits, params)
     predicted[alive] -= control * contention[alive]
@@ -135,42 +144,79 @@ def optimize_route_plan(
     equivalent to J. It enumerates deterministic acyclic parent combinations up to the
     configured search limit and evaluates every complete plan with EnergyDelayObjective.
     """
+    evaluator = evaluator or EnergyDelayObjective()
+    route_started = time.perf_counter() if evaluator.cache.profile else 0.0
+    params = context.params
+    limit = max(1, int(getattr(params, "routing_plan_search_limit", 128)))
+
+    def finish(
+        value: CandidateEvaluation,
+        evaluated: int,
+    ) -> CandidateEvaluation:
+        evaluator.cache.record_route_search(evaluated, limit)
+        evaluator.cache.record_route_seconds(route_started)
+        return value
+
     selected = tuple(sorted(dict.fromkeys(int(ch) for ch in selected_cluster_heads)))
     if not assignment.is_feasible:
         solution = CandidateSolution(selected, assignment.assignments, {})
         result = infeasible_objective(assignment.invalid_reason or "unassigned_alive_node")
-        return CandidateEvaluation(solution, result, False, result.invalid_reason)
+        return finish(
+            CandidateEvaluation(solution, result, False, result.invalid_reason), 0
+        )
     if not selected:
         solution = CandidateSolution((), assignment.assignments, {})
         result = infeasible_objective("broken_route")
-        return CandidateEvaluation(solution, result, False, result.invalid_reason)
+        return finish(
+            CandidateEvaluation(solution, result, False, result.invalid_reason), 0
+        )
 
-    evaluator = evaluator or EnergyDelayObjective()
     positions = np.asarray(context.node_positions, dtype=float)
     sink = np.asarray(context.sink_position, dtype=float)
-    predicted = predict_post_assignment_energy(assignment, context)
-    params = context.params
+    evaluator.cache.prepare(context, params, positions, sink)
+    topology = (
+        None
+        if evaluator.cache.disabled
+        else evaluator.cache.topology(positions, sink, params)
+    )
+    predicted = predict_post_assignment_energy(assignment, context, evaluator)
     options: dict[int, tuple[int | None, ...]] = {}
     for ch in selected:
         choices: list[int | None] = []
-        if (
+        reaches_sink = (
             float(np.linalg.norm(positions[ch] - sink))
             <= params.transmission_range_m
-        ):
+            if topology is None
+            else bool(topology.sink_reachable[ch])
+        )
+        if reaches_sink:
             choices.append(None)
         relays = [
             other
             for other in selected
             if other != ch
             and predicted[other] > params.dead_energy_threshold_j
-            and float(np.linalg.norm(positions[ch] - positions[other]))
-            <= params.transmission_range_m
-            and float(np.linalg.norm(positions[other] - sink))
-            < float(np.linalg.norm(positions[ch] - sink))
+            and (
+                float(np.linalg.norm(positions[ch] - positions[other]))
+                <= params.transmission_range_m
+                if topology is None
+                else bool(topology.neighbor_mask[ch, other])
+            )
+            and (
+                float(np.linalg.norm(positions[other] - sink))
+                < float(np.linalg.norm(positions[ch] - sink))
+                if topology is None
+                else float(topology.distances_to_sink_m[other])
+                < float(topology.distances_to_sink_m[ch])
+            )
         ]
         relays.sort(
             key=lambda node: (
-                float(np.linalg.norm(positions[node] - sink)),
+                (
+                    float(np.linalg.norm(positions[node] - sink))
+                    if topology is None
+                    else float(topology.distances_to_sink_m[node])
+                ),
                 int(node),
             )
         )
@@ -178,10 +224,11 @@ def optimize_route_plan(
         if not choices:
             solution = CandidateSolution(selected, assignment.assignments, {})
             result = infeasible_objective("broken_route")
-            return CandidateEvaluation(solution, result, False, result.invalid_reason)
+            return finish(
+                CandidateEvaluation(solution, result, False, result.invalid_reason), 0
+            )
         options[ch] = tuple(choices)
 
-    limit = max(1, int(getattr(params, "routing_plan_search_limit", 128)))
     best: CandidateEvaluation | None = None
     evaluated = 0
     option_lists = [options[ch] for ch in selected]
@@ -208,7 +255,10 @@ def optimize_route_plan(
     if best is None:
         solution = CandidateSolution(selected, assignment.assignments, {})
         result = infeasible_objective("broken_route")
-        return CandidateEvaluation(solution, result, False, result.invalid_reason)
+        return finish(
+            CandidateEvaluation(solution, result, False, result.invalid_reason),
+            evaluated,
+        )
 
     plan = best.solution.route_plan
     assert plan is not None
@@ -233,9 +283,12 @@ def optimize_route_plan(
         enriched.route_by_ch,
         enriched,
     )
-    return CandidateEvaluation(
-        solution,
-        best.objective_result,
-        best.is_feasible,
-        best.invalid_reason,
+    return finish(
+        CandidateEvaluation(
+            solution,
+            best.objective_result,
+            best.is_feasible,
+            best.invalid_reason,
+        ),
+        evaluated,
     )

@@ -114,6 +114,10 @@ class EnergyDelayObjectiveTests(unittest.TestCase):
         self.assertEqual(cache.stats.physical_objective_computations, 2)
         self.assertGreater(cache.stats.link_cache_hits, 0)
         self.assertGreater(cache.stats.link_cache_misses, 0)
+        self.assertEqual(cache.stats.neighbor_cache_builds, 1)
+        self.assertGreater(cache.stats.neighbor_cache_hits, 0)
+        self.assertEqual(cache.stats.contention_cache_misses, 1)
+        self.assertGreater(cache.stats.contention_cache_hits, 0)
 
     def test_shadow_mode_compares_every_cached_lookup_to_reference(self) -> None:
         with self.environment("UWSN_VERIFY_LINK_CACHE", "1"):
@@ -151,6 +155,18 @@ class EnergyDelayObjectiveTests(unittest.TestCase):
         )
         self.assertGreater(far.raw_average_delay_s, near.raw_average_delay_s)
         self.assertGreater(high_power.raw_energy_j, far.raw_energy_j)
+        self.assertEqual(cache.stats.neighbor_cache_builds, 3)
+
+    def test_cache_invalidates_when_alive_mask_changes(self) -> None:
+        cache = RoundObjectiveCache()
+        evaluator = EnergyDelayObjectiveEvaluator(cache)
+        evaluator.evaluate(self.direct_candidate(), self.context())
+        changed = self.context(residual=np.asarray([100.0, 0.0]))
+        evaluator.evaluate(
+            CandidateSolution((0,), {0: (0,)}, {0: (None,)}),
+            changed,
+        )
+        self.assertEqual(cache.stats.neighbor_cache_builds, 2)
 
     def test_objective_cache_does_not_consume_rng_state(self) -> None:
         rng = np.random.default_rng(2026)
