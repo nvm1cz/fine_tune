@@ -108,6 +108,11 @@ continuing without a recoverable checkpoint. Kaggle scheduled runs start at
 their configured time; they do not automatically start at the exact instant a
 previous 12-hour session ends.
 
+The checkpoint backend sets `DISABLE_KAGGLE_CACHE=true` before importing
+KaggleHub. This is required because non-interactive scheduled sessions cannot
+attach new Dataset inputs; the authenticated HTTP resolver downloads the latest
+checkpoint Dataset version instead.
+
 Results are written to `/kaggle/working/uwsn_tuning`. Re-running the same
 command resumes completed trials from `trials.jsonl`. The main artifacts are:
 

@@ -1,6 +1,10 @@
+import os
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from uwsn.kaggle_checkpoint import KaggleDatasetCheckpoint
 
@@ -47,6 +51,20 @@ class KaggleDatasetCheckpointTests(unittest.TestCase):
     def test_invalid_handle_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             KaggleDatasetCheckpoint("missing-owner")
+
+    def test_production_backend_disables_notebook_attach_resolver(self) -> None:
+        fake = types.SimpleNamespace(
+            dataset_download=lambda *args, **kwargs: "downloaded",
+            dataset_upload=lambda *args, **kwargs: None,
+        )
+        checkpoint = KaggleDatasetCheckpoint("owner/checkpoint")
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("DISABLE_KAGGLE_CACHE", None)
+            with patch.dict(sys.modules, {"kagglehub": fake}):
+                download, upload = checkpoint._backend()
+            self.assertEqual(os.environ["DISABLE_KAGGLE_CACHE"], "true")
+        self.assertEqual(download(), "downloaded")
+        self.assertIsNone(upload())
 
 
 if __name__ == "__main__":

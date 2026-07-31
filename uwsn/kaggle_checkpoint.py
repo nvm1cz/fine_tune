@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 
 CHECKPOINT_FILENAMES = {
@@ -37,6 +38,10 @@ class KaggleDatasetCheckpoint:
     def _backend(self) -> tuple[Callable[..., str], Callable[..., None]]:
         if self._download_fn is not None and self._upload_fn is not None:
             return self._download_fn, self._upload_fn
+        # Kaggle's notebook-native resolver tries to attach a Dataset. Batch and
+        # scheduled sessions cannot attach a new Dataset, so force KaggleHub's
+        # authenticated HTTP resolver, which also retrieves the latest version.
+        os.environ["DISABLE_KAGGLE_CACHE"] = "true"
         try:
             import kagglehub
         except ImportError as exc:
