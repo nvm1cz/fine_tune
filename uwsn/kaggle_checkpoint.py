@@ -14,6 +14,11 @@ CHECKPOINT_FILENAMES = {
     "progress.log",
     "manifest.json",
     "best_summary.json",
+    "benchmark_results.jsonl",
+    "completed_cases.jsonl",
+    "case_summary.csv",
+    "round_metrics.csv",
+    "benchmark_manifest.json",
 }
 
 

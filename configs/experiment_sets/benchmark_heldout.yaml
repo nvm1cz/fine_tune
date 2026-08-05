@@ -1,0 +1,18 @@
+{
+  "experiment_set": "benchmark_heldout",
+  "base_configs": ["configs/base/environment.yaml", "configs/base/channel.yaml", "configs/base/protocol.yaml", "configs/base/execution.yaml", "configs/base/objective.yaml"],
+  "algorithms": ["configs/benchmarks/best_eulc_pso.yaml", "configs/benchmarks/best_eulc_ga.yaml"],
+  "mode": "cartesian",
+  "deployment_sizes": [[100,100,100]],
+  "densities": ["medium"],
+  "distributions": ["uniform","gaussian","exponential"],
+  "seeds": [10,11,12,13,14,15,16,17,18,19],
+  "node_count_mapping": {"100x100x100":{"medium":100}},
+  "overrides": {
+    "environment":{"initial_energy_j":0.5,"packet_size_bits":6400},
+    "channel":{"sound_speed_model":"constant","sound_speed_mps":1500.0},
+    "execution":{"rounds":1000,"stop_on_first_dead":false},
+    "output":{"save_round_metrics":true,"save_convergence":false}
+  },
+  "sweep": {"channel.transmission_range_m":[200.0]}
+}
