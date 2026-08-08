@@ -13,7 +13,11 @@ from uwsn.kaggle_checkpoint import KaggleDatasetCheckpoint
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Resumable held-out UWSN benchmark")
-    parser.add_argument("--algorithm", choices=("eulc_pso", "eulc_ga"), required=True)
+    parser.add_argument(
+        "--algorithm",
+        choices=("eulc_pso", "eulc_ga", "eulc_ac_aco"),
+        required=True,
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--checkpoint-dataset", required=True)
     parser.add_argument("--workers", type=int, default=4)

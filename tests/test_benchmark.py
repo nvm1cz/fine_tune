@@ -29,10 +29,32 @@ class BenchmarkTests(unittest.TestCase):
     def test_frozen_best_configs_match_validated_results(self) -> None:
         pso = load_algorithm_config(ROOT / "configs/benchmarks/best_eulc_pso.yaml")
         ga = load_algorithm_config(ROOT / "configs/benchmarks/best_eulc_ga.yaml")
+        ac_aco = load_algorithm_config(
+            ROOT / "configs/benchmarks/best_eulc_ac_aco.yaml"
+        )
         self.assertEqual((pso["optimizer"]["population_size"], pso["optimizer"]["max_iterations"]), (40, 24))
         self.assertEqual((pso["optimizer"]["params"]["c1"], pso["optimizer"]["params"]["c2"]), (2.0, 1.6))
         self.assertEqual((ga["optimizer"]["population_size"], ga["optimizer"]["max_iterations"]), (50, 19))
         self.assertEqual(ga["optimizer"]["params"], {"crossover_rate": 0.8, "mutation_sigma": 0.1})
+        self.assertEqual(
+            (
+                ac_aco["optimizer"]["population_size"],
+                ac_aco["optimizer"]["max_iterations"],
+            ),
+            (20, 50),
+        )
+        self.assertEqual(ac_aco["optimizer"]["params"]["alpha"], 0.5)
+        self.assertEqual(ac_aco["optimizer"]["params"]["beta_start"], 0.5)
+        self.assertEqual(ac_aco["optimizer"]["params"]["beta_end"], 2.0)
+        self.assertEqual(ac_aco["optimizer"]["params"]["chaos_strength"], 0.2)
+        self.assertEqual(
+            (
+                ac_aco["optimizer"]["params"]["heuristic_energy_weight"],
+                ac_aco["optimizer"]["params"]["heuristic_eulc_weight"],
+                ac_aco["optimizer"]["params"]["heuristic_centrality_weight"],
+            ),
+            (0.4, 0.4, 0.2),
+        )
 
     def test_derived_outputs_are_rebuilt_from_durable_results(self) -> None:
         result = {
