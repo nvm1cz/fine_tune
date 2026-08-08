@@ -16,6 +16,13 @@ from .experiment_config.runner import build_simulator
 
 
 SCHEMA_VERSION = 1
+AC_ACO_NO_FEASIBLE_SOLUTION = "AC-ACO did not evaluate any solution"
+ROUND_METRIC_FIELDS = [
+    "algorithm_id", "case_id", "distribution", "seed", "round",
+    "residual_energy_j", "energy_consumed_j", "alive_nodes", "dead_nodes",
+    "packets_delivered_round", "packets_delivered_cumulative",
+    "delay_s_round", "average_delay_s_round",
+]
 
 
 def _hash(value: Any) -> str:
@@ -61,12 +68,36 @@ def _run_case(job: dict[str, Any]) -> dict[str, Any]:
     started = time.perf_counter()
     case = job["case"]
     simulator, execution = build_simulator(case, job["algorithm_config"])
-    metrics = simulator.run(
-        stop_on_first_dead=bool(execution["stop_on_first_dead"]),
-        stop_at_ft5=bool(execution["stop_at_first_5pct_dead"]),
-        min_alive_ratio=execution["min_alive_ratio"],
-        max_rounds=int(execution["rounds"]),
-    )
+    try:
+        metrics = simulator.run(
+            stop_on_first_dead=bool(execution["stop_on_first_dead"]),
+            stop_at_ft5=bool(execution["stop_at_first_5pct_dead"]),
+            min_alive_ratio=execution["min_alive_ratio"],
+            max_rounds=int(execution["rounds"]),
+        )
+    except RuntimeError as exc:
+        if str(exc) != AC_ACO_NO_FEASIBLE_SOLUTION:
+            raise
+        return {
+            "case_key": job["case_key"],
+            "algorithm_id": simulator.algorithm_id,
+            "case_id": case["metadata"]["case_id"],
+            "distribution": case["environment"]["distribution"],
+            "seed": int(case["metadata"]["base_seed"]),
+            "config_hash": case["metadata"]["config_hash"],
+            "rounds_completed": 0,
+            "fnd_round": None, "hnd_round": None, "lnd_round": None,
+            "final_residual_energy_j": None,
+            "total_energy_consumed_j": None,
+            "packets_generated": 0, "packets_delivered": 0,
+            "packet_delivery_ratio": 0.0,
+            "average_e2e_delay_s": None,
+            "runtime_seconds": time.perf_counter() - started,
+            "round_metrics": [],
+            "status": "infeasible",
+            "invalid_reason": "no_feasible_solution",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
     initial_energy = simulator.case.initial_energy * simulator.case.node_count
     rounds = []
     cumulative_packets = 0
@@ -108,6 +139,8 @@ def _run_case(job: dict[str, Any]) -> dict[str, Any]:
         "runtime_seconds": time.perf_counter() - started,
         "round_metrics": rounds,
         "status": "completed",
+        "invalid_reason": None,
+        "error": None,
     }
 
 
@@ -128,7 +161,7 @@ def _write_derived(output: Path, results: list[dict[str, Any]]) -> None:
                 **row,
             })
     _atomic_csv(output / "case_summary.csv", summaries, list(summaries[0]))
-    _atomic_csv(output / "round_metrics.csv", round_rows, list(round_rows[0]))
+    _atomic_csv(output / "round_metrics.csv", round_rows, ROUND_METRIC_FIELDS)
     temporary = output / "completed_cases.jsonl.tmp"
     with temporary.open("w", encoding="utf-8") as handle:
         for row in completed:
@@ -196,7 +229,11 @@ def run_benchmark(
         _write_derived(output, ordered)
         manifest["completed_cases"] = len(results)
         _atomic_json(manifest_path, manifest)
-        print(f"[benchmark] {len(results)}/{len(cases)} | {row['case_id']} | completed", flush=True)
+        print(
+            f"[benchmark] {len(results)}/{len(cases)} | "
+            f"{row['case_id']} | {row['status']}",
+            flush=True,
+        )
         if checkpoint_callback:
             checkpoint_callback(output, f"benchmark {len(results)}/{len(cases)}")
 

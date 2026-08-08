@@ -3,9 +3,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from uwsn.algorithms.config import load_algorithm_config
-from uwsn.benchmark import _write_derived
+from uwsn.benchmark import _run_case, _write_derived
 from uwsn.experiment_config.generation import ExperimentGenerator
 
 
@@ -13,6 +14,40 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_ac_aco_no_feasible_case_is_terminal_and_explicit(self) -> None:
+        simulator = Mock()
+        simulator.algorithm_id = "eulc_ac_aco"
+        simulator.run.side_effect = RuntimeError(
+            "AC-ACO did not evaluate any solution"
+        )
+        execution = {
+            "stop_on_first_dead": False,
+            "stop_at_first_5pct_dead": False,
+            "min_alive_ratio": None,
+            "rounds": 50,
+        }
+        case = {
+            "metadata": {
+                "case_id": "heldout", "base_seed": 10,
+                "config_hash": "case-hash",
+            },
+            "environment": {"distribution": "uniform"},
+        }
+        with patch(
+            "uwsn.benchmark.build_simulator",
+            return_value=(simulator, execution),
+        ):
+            row = _run_case({
+                "case_key": "aco|heldout|10", "case": case,
+                "algorithm_config": {},
+            })
+        self.assertEqual(row["status"], "infeasible")
+        self.assertEqual(row["invalid_reason"], "no_feasible_solution")
+        self.assertEqual(row["round_metrics"], [])
+        with tempfile.TemporaryDirectory() as directory:
+            _write_derived(Path(directory), [row])
+            self.assertTrue((Path(directory) / "round_metrics.csv").exists())
+
     def test_heldout_campaign_has_shared_thirty_cases(self) -> None:
         cases = ExperimentGenerator(
             ROOT / "configs/experiment_sets/benchmark_heldout.yaml"
