@@ -49,6 +49,10 @@ def main() -> None:
         type=Path,
         help="Directory containing a compatible manifest and trials.jsonl.",
     )
+    parser.add_argument(
+        "--allow-checkpoint-commit",
+        help="Explicitly allow one prior checkpoint commit for a controlled migration.",
+    )
     args = parser.parse_args()
     checkpoint = (
         KaggleDatasetCheckpoint(args.checkpoint_dataset)
@@ -65,6 +69,7 @@ def main() -> None:
         config_end=args.config_end,
         max_wall_time_seconds=args.max_wall_time_seconds,
         resume_from=args.resume_from,
+        allow_checkpoint_commit=args.allow_checkpoint_commit,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
 

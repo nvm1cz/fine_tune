@@ -22,6 +22,8 @@ from .experiment_config.runner import build_simulator
 
 
 TUNED_ALGORITHMS = ("eulc_pso", "eulc_ga", "eulc_ac_aco")
+TERMINAL_TRIAL_STATUSES = frozenset(("completed", "infeasible"))
+AC_ACO_NO_FEASIBLE_SOLUTION = "AC-ACO did not evaluate any solution"
 TUNING_CHECKPOINT_SCHEMA = 2
 
 
@@ -174,6 +176,29 @@ def _run_trial_job(job: dict[str, Any]) -> dict[str, Any]:
             ),
             "runtime_seconds": time.perf_counter() - started,
             "error": None,
+        }
+    except RuntimeError as exc:
+        if str(exc) == AC_ACO_NO_FEASIBLE_SOLUTION:
+            return {
+                **job["identity"], "status": "infeasible",
+                "rounds_completed": 0, "fnd_round": None,
+                "fnd_censored": True, "survival_score": 0,
+                "residual_energy_auc": 0.0,
+                "final_residual_energy_fraction": 0.0,
+                "packets_delivered": 0,
+                "average_e2e_delay_s": float("inf"),
+                "runtime_seconds": time.perf_counter() - started,
+                "error": f"{type(exc).__name__}: {exc}",
+                "invalid_reason": "no_feasible_solution",
+            }
+        return {
+            **job["identity"], "status": "failed",
+            "rounds_completed": 0, "fnd_round": None, "fnd_censored": True,
+            "survival_score": 0, "residual_energy_auc": 0.0,
+            "final_residual_energy_fraction": 0.0, "packets_delivered": 0,
+            "average_e2e_delay_s": float("inf"),
+            "runtime_seconds": time.perf_counter() - started,
+            "error": f"{type(exc).__name__}: {exc}",
         }
     except Exception as exc:
         return {
@@ -433,6 +458,7 @@ def run_tuning(
     config_end: int | None = None,
     max_wall_time_seconds: int | None = None,
     resume_from: Path | None = None,
+    allow_checkpoint_commit: str | None = None,
     trial_runner: Callable[[dict[str, Any]], dict[str, Any]] = _run_trial_job,
 ) -> dict[str, Any]:
     root = spec_path.resolve().parents[2]
@@ -536,7 +562,11 @@ def run_tuning(
             raise ValueError("checkpoint schema version does not match")
         if previous_manifest.get("spec_hash") != spec_hash:
             raise ValueError("checkpoint tuning config does not match")
-        if previous_manifest.get("git_commit") != git_commit:
+        previous_commit = previous_manifest.get("git_commit")
+        if (
+            previous_commit != git_commit
+            and previous_commit != allow_checkpoint_commit
+        ):
             raise ValueError("checkpoint git commit does not match")
         if previous_manifest.get("algorithms") != list(selected_algorithms):
             raise ValueError("checkpoint algorithm selection does not match")
@@ -549,6 +579,12 @@ def run_tuning(
         "schema_version": TUNING_CHECKPOINT_SCHEMA,
         "spec_hash": spec_hash,
         "git_commit": git_commit,
+        "resumed_from_git_commit": (
+            previous_manifest.get("git_commit")
+            if manifest_path.exists()
+            and previous_manifest.get("git_commit") != git_commit
+            else None
+        ),
         "requested_stage": stage_name,
         "config_start": int(config_start),
         "config_end": config_end,
@@ -556,7 +592,8 @@ def run_tuning(
         "completed": False,
         "stop_reason": None,
         "completed_trial_keys": sum(
-            row.get("status") == "completed" for row in existing.values()
+            row.get("status") in TERMINAL_TRIAL_STATUSES
+            for row in existing.values()
         ),
     }
     _atomic_write_json(manifest_path, manifest)
@@ -564,7 +601,8 @@ def run_tuning(
     all_stage_rankings: list[dict[str, Any]] = []
     overall_total = sum(int(stage["planned_runs"]) for stage in plan["stages"])
     overall_done = sum(
-        row.get("status") == "completed" for row in existing.values()
+        row.get("status") in TERMINAL_TRIAL_STATUSES
+        for row in existing.values()
     )
     stopped_for_time = False
     ran_requested_stage = False
@@ -620,7 +658,8 @@ def run_tuning(
         stage_rows = [
             existing[key]
             for key in stage_key_order
-            if key in existing and existing[key].get("status") == "completed"
+            if key in existing
+            and existing[key].get("status") in TERMINAL_TRIAL_STATUSES
         ]
         jobs = [
             job
@@ -628,7 +667,8 @@ def run_tuning(
             if job["identity"]["trial_key"] in selected_job_keys
             and (
                 job["identity"]["trial_key"] not in existing
-                or existing[job["identity"]["trial_key"]].get("status") != "completed"
+                or existing[job["identity"]["trial_key"]].get("status")
+                not in TERMINAL_TRIAL_STATUSES
             )
         ]
         stage_total = len(stage_keys)
@@ -659,12 +699,13 @@ def run_tuning(
             existing[key] = row
             _append_durable_jsonl(results_path, row)
             completed_runtimes.append(float(row.get("runtime_seconds", 0.0)))
-            if row.get("status") == "completed":
+            if row.get("status") in TERMINAL_TRIAL_STATUSES:
                 stage_done += 1
                 overall_done += 1
                 stage_rows.append(row)
             manifest["completed_trial_keys"] = sum(
-                value.get("status") == "completed" for value in existing.values()
+                value.get("status") in TERMINAL_TRIAL_STATUSES
+                for value in existing.values()
             )
             manifest["active_stage"] = current_stage
             manifest["stage_completed"] = stage_done
@@ -719,7 +760,8 @@ def run_tuning(
                         break
 
         stage_complete = all(
-            key in existing and existing[key].get("status") == "completed"
+            key in existing
+            and existing[key].get("status") in TERMINAL_TRIAL_STATUSES
             for key in stage_keys
         )
         if not stage_complete:
@@ -729,7 +771,8 @@ def run_tuning(
             )
             manifest["active_stage"] = current_stage
             manifest["stage_completed"] = sum(
-                key in existing and existing[key].get("status") == "completed"
+                key in existing
+                and existing[key].get("status") in TERMINAL_TRIAL_STATUSES
                 for key in stage_keys
             )
             manifest["stage_total"] = stage_total

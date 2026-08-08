@@ -10,6 +10,7 @@ from uwsn.algorithms.config import load_algorithm_config
 from uwsn.experiment_config.generation import ExperimentGenerator
 from uwsn.experiment_config.io import load_yaml
 from uwsn.tuning import (
+    _run_trial_job,
     aggregate_rankings,
     sample_trial_configs,
     select_stage_cases,
@@ -104,6 +105,29 @@ class TuningTests(unittest.TestCase):
         ranked = aggregate_rankings([failed, good], 1)
         self.assertEqual(ranked[0]["trial_id"], "good")
         self.assertEqual(ranked[0]["rank"], 1)
+
+    def test_ac_aco_no_feasible_solution_is_terminal_and_penalized(self) -> None:
+        identity = {
+            "stage": "validate", "algorithm_id": "eulc_ac_aco",
+            "trial_id": "aco", "trial_config_hash": "hash",
+            "case_id": "case", "scenario": "case",
+            "case_config_hash": "case-hash", "base_seed": 8,
+            "distribution": "uniform", "trial_key": "key",
+        }
+        with patch(
+            "uwsn.tuning.build_simulator",
+            side_effect=RuntimeError("AC-ACO did not evaluate any solution"),
+        ):
+            row = _run_trial_job({
+                "identity": identity,
+                "case": {"execution": {}, "output": {}}, "rounds": 50,
+                "algorithm_config": {},
+            })
+        self.assertEqual(row["status"], "infeasible")
+        self.assertEqual(row["invalid_reason"], "no_feasible_solution")
+        ranking = aggregate_rankings([row], 1)[0]
+        self.assertEqual(ranking["completion_rate"], 0.0)
+        self.assertEqual(ranking["completed_runs"], 0)
 
     def test_stable_hash_ignores_mapping_order(self) -> None:
         self.assertEqual(stable_hash({"a": 1, "b": 2}), stable_hash({"b": 2, "a": 1}))
