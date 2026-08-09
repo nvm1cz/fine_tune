@@ -19,6 +19,9 @@ CHECKPOINT_FILENAMES = {
     "case_summary.csv",
     "round_metrics.csv",
     "benchmark_manifest.json",
+    "recovery_results.jsonl",
+    "recovery_summary.csv",
+    "recovery_manifest.json",
 }
 
 
