@@ -1,0 +1,21 @@
+{
+  "experiment_set": "diagnostic_early_fnd",
+  "base_configs": ["configs/base/environment.yaml", "configs/base/channel.yaml", "configs/base/protocol.yaml", "configs/base/execution.yaml", "configs/base/objective.yaml"],
+  "algorithms": ["configs/algorithms/eulc.yaml", "configs/benchmarks/best_eulc_pso.yaml", "configs/benchmarks/best_eulc_ga.yaml", "configs/benchmarks/best_eulc_ac_aco.yaml"],
+  "mode": "cartesian",
+  "deployment_sizes": [[100,100,100]],
+  "densities": ["medium"],
+  "distributions": ["gaussian"],
+  "seeds": [0,1,2],
+  "node_count_mapping": {"100x100x100":{"medium":100}},
+  "overrides": {
+    "channel":{"sound_speed_model":"constant","sound_speed_mps":1500.0},
+    "execution":{"rounds":30,"stop_on_first_dead":false},
+    "output":{"save_round_metrics":true,"save_convergence":false}
+  },
+  "sweep": {
+    "environment.initial_energy_j":[0.5,1.0],
+    "environment.packet_size_bits":[6400,4000],
+    "channel.transmission_range_m":[200.0]
+  }
+}
