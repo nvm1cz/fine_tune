@@ -22,6 +22,9 @@ CHECKPOINT_FILENAMES = {
     "recovery_results.jsonl",
     "recovery_summary.csv",
     "recovery_manifest.json",
+    "ofat_manifest.json",
+    "ofat_trials.jsonl",
+    "ofat_history.jsonl",
 }
 
 
