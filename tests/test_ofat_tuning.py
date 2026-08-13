@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+import subprocess
+import sys
 from pathlib import Path
 
 from uwsn.algorithms.config import load_algorithm_config
@@ -39,6 +41,18 @@ class OfatTuningTests(unittest.TestCase):
         self.assertEqual(spec["coordinates"]["eulc_ga"][0]["name"], "budget_pair")
         self.assertEqual(spec["coordinates"]["eulc_pso"][1]["name"], "inertia")
         self.assertEqual(spec["coordinates"]["eulc_ac_aco"][1]["name"], "alpha")
+
+    def test_cli_accepts_auto_stage(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable, str(ROOT / "scripts/run_kaggle_ofat_tuning.py"),
+                "--algorithm", "eulc_ga", "--stage", "auto",
+                "--output-dir", "/tmp/uwsn-ofat-cli-plan",
+            ],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"stage": "screen"', result.stdout)
 
 
 if __name__ == "__main__":
