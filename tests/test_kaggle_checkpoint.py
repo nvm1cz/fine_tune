@@ -17,6 +17,7 @@ class KaggleDatasetCheckpointTests(unittest.TestCase):
             output = root / "output"
             remote.mkdir()
             (remote / "trials.jsonl").write_text('{"status":"completed"}\n')
+            (remote / "scenario_best_configs.json").write_text('{"configs":{}}\n')
             (remote / "placeholder.txt").write_text("placeholder")
             uploads = []
 
@@ -37,14 +38,17 @@ class KaggleDatasetCheckpointTests(unittest.TestCase):
                 upload_fn=upload,
             )
             restored = checkpoint.restore(output)
-            self.assertEqual(restored, ["trials.jsonl"])
+            self.assertEqual(restored, ["scenario_best_configs.json", "trials.jsonl"])
             self.assertFalse((output / "placeholder.txt").exists())
 
             (output / "progress.json").write_text("{}")
+            (output / "scenario_registry_eulc_pso.csv").write_text("scenario_key\n")
             checkpoint.publish(output, "screen 1/10")
             self.assertEqual(uploads[0]["handle"], "owner/checkpoint")
             self.assertEqual(
-                uploads[0]["files"], ["progress.json", "trials.jsonl"]
+                uploads[0]["files"],
+                ["progress.json", "scenario_best_configs.json",
+                 "scenario_registry_eulc_pso.csv", "trials.jsonl"],
             )
             self.assertEqual(uploads[0]["note"], "screen 1/10")
 

@@ -25,6 +25,10 @@ CHECKPOINT_FILENAMES = {
     "ofat_manifest.json",
     "ofat_trials.jsonl",
     "ofat_history.jsonl",
+    "scenario_ofat_manifest.json",
+    "scenario_ofat_trials.jsonl",
+    "scenario_ofat_history.jsonl",
+    "scenario_best_configs.json",
 }
 
 
@@ -67,6 +71,7 @@ class KaggleDatasetCheckpoint:
             path.name in CHECKPOINT_FILENAMES
             or path.name.startswith("rankings_") and path.suffix == ".csv"
             or path.name.startswith("best_config_") and path.suffix == ".yaml"
+            or path.name.startswith("scenario_registry_") and path.suffix in {".csv", ".json"}
         )
 
     def restore(self, output_dir: Path) -> list[str]:

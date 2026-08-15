@@ -1,0 +1,40 @@
+{
+  "name": "kaggle_per_scenario_ofat_v1",
+  "experiment_set": "configs/experiment_sets/tuning_ofat_full.yaml",
+  "algorithms": {
+    "eulc_pso": "configs/algorithms/eulc_pso.yaml",
+    "eulc_ga": "configs/algorithms/eulc_ga.yaml",
+    "eulc_ac_aco": "configs/algorithms/eulc_ac_aco.yaml"
+  },
+  "passes": 2,
+  "stages": [
+    {"name":"screen","rounds":50,"seeds":[0,1],"tune_coordinates":true},
+    {"name":"refine","rounds":200,"seeds":[2,3,4,5,6],"tune_coordinates":true},
+    {"name":"validate","rounds":1000,"seeds":[7,8,9],"tune_coordinates":false}
+  ],
+  "coordinates": {
+    "eulc_pso": [
+      {"name":"budget_pair","values":[[20,49],[25,39],[40,24],[50,19]]},
+      {"name":"inertia","values":[0.4,0.55,0.7,0.85,0.9]},
+      {"name":"c1","values":[0.5,0.8,1.0,1.2,1.5,1.6,2.0]},
+      {"name":"c2","values":[0.5,0.8,1.0,1.2,1.5,1.6,2.0]},
+      {"name":"omega","values":[0.3,0.45,0.6,0.75,0.9]},
+      {"name":"stagnation_restart_iterations","values":[3,5,10,20]},
+      {"name":"stagnation_restart_fraction","values":[0.1,0.25,0.5]}
+    ],
+    "eulc_ga": [
+      {"name":"budget_pair","values":[[20,49],[25,39],[40,24],[50,19]]},
+      {"name":"crossover_rate","values":[0.6,0.7,0.8,0.9,0.95]},
+      {"name":"mutation_sigma","values":[0.02,0.05,0.1,0.15,0.2,0.3]}
+    ],
+    "eulc_ac_aco": [
+      {"name":"budget_pair","values":[[20,50],[25,40],[40,25],[50,20]]},
+      {"name":"alpha","values":[0.5,1.0,1.5,2.0]},
+      {"name":"beta_schedule","values":[[0.5,2.0],[1.0,3.0],[1.5,4.0],[2.0,5.0]]},
+      {"name":"rho_schedule","values":[[0.3,0.05],[0.5,0.1],[0.65,0.15],[0.8,0.3]]},
+      {"name":"chaos_strength","values":[0.0,0.05,0.1,0.2,0.3]},
+      {"name":"stagnation_limit","values":[5,10,20]},
+      {"name":"heuristic_weights","values":[[0.6,0.2,0.2],[0.5,0.25,0.25],[0.4,0.4,0.2],[0.34,0.33,0.33]]}
+    ]
+  }
+}
