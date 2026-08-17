@@ -12,8 +12,9 @@ starting any new PSO tuning campaign.
 - Packet sizes: 4000 and 6400 bits.
 - Initial node energies: 0.5 and 1.0 J.
 - Each density therefore has four packet-energy scenarios.
-- A simulation run stops immediately after the first node death (FND).
-- `max_simulation_rounds = 500` is only a safety/censoring ceiling.
+- Fine-tuning evaluates the optimizer at the initial network state only (one
+  clustering/optimization round). FND is not a tuning criterion.
+- Network lifetime and FND must be validated in a separate later experiment.
 
 Do not compare or pool raw objective J values across different network states.
 Each scenario is tuned and reported independently.
@@ -31,45 +32,51 @@ Record the observed D for every seed.
 
 All comparisons use paired deterministic seeds. Screening uses seeds 0-9 and
 the final comparison uses independent seeds 10-39. Select by the lowest mean
-final best J; if means tie, select the lowest population standard deviation; if both
-tie, retain the user-specified candidate order.
+final best J. Statistical indistinguishability is assessed with a deterministic
+paired bootstrap 95% confidence interval (10,000 resamples) for the difference
+from the minimum-mean candidate. Among statistically indistinguishable candidates,
+prefer lower population standard deviation, then lower runtime, then retain the
+user-specified candidate order.
 
-1. Population pre-screen: compare N = 20 and N = 30 with fixed w = 0.9,
-   c1 = c2 = 2.0, and the initial `max_iter = 200`.
-2. Inertia schedule: with the selected N and c1 = c2 = 2.0, compare linear
-   schedules 0.9 -> 0.4, 0.9 -> 0.2, and 1.0 -> 0.4.
+1. Dimension probe: record the actual EULC candidate-vector dimension D and use
+   `ceil(10 + 2*sqrt(mean(D)))`, clamped to 20-30, as the baseline N.
+2. Inertia schedule: with baseline `max_iter=50`, baseline N and c1=c2=2.0,
+   compare fixed 0.9 plus linear schedules 0.9->0.4, 0.9->0.2 and 1.0->0.4.
 3. Acceleration coefficients: retain the selected inertia strategy and compare
-   (2.0, 2.0), (2.5, 1.5), (1.5, 2.5). Compare the Clerc-Kennedy pair
-   (1.49445, 1.49445) only with fixed w = 0.729.
-4. Population/iteration retest: compare the Cartesian grid N in {20, 30} and
-   `max_iter` in {100, 150, 200}, using the selected w, c1, and c2. Inspect the
-   saved convergence curves when interpreting whether the winning iteration
-   budget is already on a plateau. The project does not invent a numerical
-   plateau threshold; a future automatic plateau rule remains TODO until the
-   user confirms its tolerance and patience.
-5. Velocity limit: compare Vmax = 1.0, 0.2, and 0.1 in the normalized [0,1]
-   priority space. Vmax 0.1 and 0.2 correspond to 10% and 20% of the variable
-   range. Do not claim Vmax was necessary without convergence evidence.
+   (2.0,2.0), (2.5,1.5), (1.5,2.5), and (1.49445,1.49445).
+4. Plateau and N: plateau means relative best-J improvement below 0.1% for 20
+   consecutive iterations. Add 25% to the detected median plateau iteration.
+   Also report sensitivity at 0.05%/10 and 0.5%/30. Compare N=20,30,50 at the
+   proposed iteration count. If J improvement is below 0.1%, prefer lower runtime.
+5. Velocity limit: measure mean per-dimension particle standard deviation around
+   the centroid. Because priorities are dimensionless [0,1], scale this value by
+   the physical 100x100x100 m diagonal for the required diagnostic. Only compare
+   Vmax=1.0,0.1,0.2 when plateau is detected and mean diversity over the final 20
+   iterations exceeds 8.660254 m (5% of the 173.205081 m diagonal).
 6. Final comparison: compare the tuned configuration with the project default
    (fixed w = 0.9, c1 = c2 = 2.0, N = 30) on 30 independent paired seeds.
 
-The default comparator uses fixed w = 0.9, c1 = c2 = 2.0, N = 30, and
-`max_iter = 200`, exactly as requested.
+The default comparator uses fixed w=0.9, c1=c2=2.0, N=30, max_iter=50 and
+Vmax=1.0. Final comparison uses 30 paired independent seeds.
 
 ## Required outputs
 
 For every run save: scenario identity, seed, observed particle dimension,
 population, iterations, inertia schedule/start/end, c1, c2, Vmax, initial and
-final best J, improvement, runtime, FND or censoring state, rounds executed,
-alive nodes and residual energy at stop, packet-delivery ratio, and convergence
-history.
+final best J, improvement, runtime, and convergence/diversity history. Lifetime
+metrics are deliberately excluded from parameter selection.
 
 For every scenario save:
 
 - `trials.csv`
 - `convergence.csv`
-- `phase_winners.csv`
-- `all_config_rankings.csv`
+- `step_winners.csv`
+- `all_step_rankings.csv`
+- `plateau_sensitivity.csv`
+- `diversity_diagnostic.json`
+- `final_convergence_summary.csv`
+- `best_config.yaml`
+- `selection_explanation.md`
 - `result.json`
 - default-versus-tuned convergence plots in PNG and PDF
 

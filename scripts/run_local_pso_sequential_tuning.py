@@ -150,6 +150,9 @@ def _run_once(
             "seed": seed,
             "iteration": int(row["iteration"]),
             "best_J": float(row["best_score"]),
+            "swarm_diversity_normalized": row.get("swarm_diversity_normalized"),
+            "swarm_diversity_equivalent_m": row.get("swarm_diversity_equivalent_m"),
+            "deployment_diagonal_m": row.get("deployment_diagonal_m"),
         }
         for row in first_refresh
     ]

@@ -30,6 +30,20 @@ SCENARIOS = {
 }
 
 
+def _is_exact_result(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        result = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        result.get("schema_version") == 3
+        and result.get("method_version") == "exact_sequential_pso_initial_state_v1"
+        and result.get("scope") == "optimizer tuning at initial network state only"
+    )
+
+
 def _write_manifest(output: Path, density: str, completed: list[str], stop_reason: str | None) -> None:
     payload = {
         "schema_version": 1,
@@ -88,7 +102,7 @@ def main() -> None:
     started = time.perf_counter()
     completed = [
         scenario for scenario in SCENARIOS[args.density]
-        if (output / scenario / "result.json").exists()
+        if _is_exact_result(output / scenario / "result.json")
     ]
     _write_manifest(output, args.density, completed, None)
 

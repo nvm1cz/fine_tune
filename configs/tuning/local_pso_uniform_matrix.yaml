@@ -3,7 +3,7 @@
   "deployment_size_m": [100, 100, 100],
   "distribution": "uniform",
   "transmission_range_m": 150.0,
-  "max_simulation_rounds": 500,
+  "max_simulation_rounds": 1,
   "densities": [
     {"name": "sparse", "node_count": 50},
     {"name": "medium", "node_count": 100},
@@ -17,8 +17,7 @@
   ],
   "optimizer": {
     "particle_candidates": [20, 30],
-    "initial_max_iterations": 200,
-    "iteration_candidates": [100, 150, 200],
+    "initial_max_iterations": 50,
     "screen_seeds": 10,
     "screen_seed_start": 0,
     "final_seeds": 30,
@@ -26,6 +25,15 @@
     "workers": 4,
     "w_schedules": [[0.9, 0.4], [0.9, 0.2], [1.0, 0.4]],
     "c_pairs": [[2.0, 2.0], [2.5, 1.5], [1.5, 2.5], [1.49445, 1.49445]],
-    "velocity_max_values": [1.0, 0.2, 0.1]
+    "velocity_max_values": [1.0, 0.1, 0.2],
+    "plateau_sensitivity": [
+      {"name": "primary", "relative_improvement": 0.001, "patience": 20},
+      {"name": "strict_short", "relative_improvement": 0.0005, "patience": 10},
+      {"name": "loose_long", "relative_improvement": 0.005, "patience": 30}
+    ],
+    "plateau_buffer_fraction": 0.25,
+    "diversity_tail_iterations": 20,
+    "diversity_diagonal_fraction": 0.05,
+    "population_candidates_step3": [20, 30, 50]
   }
 }

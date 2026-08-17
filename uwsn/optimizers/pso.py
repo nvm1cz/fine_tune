@@ -23,6 +23,15 @@ PSO_POSITION_MAX = 1.0
 PSO_VELOCITY_MAX = 1.0
 
 
+def swarm_diversity_metrics(
+    swarm_positions: np.ndarray, deployment_diagonal_m: float
+) -> tuple[float, float]:
+    """Return mean per-dimension std and its user-requested physical equivalent."""
+    centroid = np.mean(swarm_positions, axis=0)
+    diversity_normalized = float(np.mean(np.std(swarm_positions - centroid, axis=0)))
+    return diversity_normalized, diversity_normalized * float(deployment_diagonal_m)
+
+
 def inertia_weight(params: TunableParams, iteration: int) -> float:
     """Return fixed or linearly decreasing inertia for a one-based iteration."""
     if params.pso_inertia_schedule == "fixed":
@@ -125,6 +134,12 @@ def run_pso_cluster_head_selection(
             energies, decode(best_position), candidates, params.dead_energy_threshold_j
         ))
         best = score_cache[key]
+        deployment_diagonal_m = float(np.linalg.norm([
+            params.width_m, params.height_m, params.depth_m
+        ]))
+        diversity_normalized, diversity_equivalent_m = swarm_diversity_metrics(
+            positions_swarm, deployment_diagonal_m
+        )
         diagnostics_callback({
             "iteration": iteration,
             "evaluations": len(score_cache),
@@ -133,6 +148,9 @@ def run_pso_cluster_head_selection(
             "best_delay_term": best.delay_term_d,
             "feasible_count": sum(result.is_feasible for result in score_cache.values()),
             "invalid_count": sum(not result.is_feasible for result in score_cache.values()),
+            "swarm_diversity_normalized": diversity_normalized,
+            "swarm_diversity_equivalent_m": diversity_equivalent_m,
+            "deployment_diagonal_m": deployment_diagonal_m,
         })
 
     personal_best = positions_swarm.copy()
