@@ -1,0 +1,21 @@
+{
+  "name": "pso_percase_dense_100_ofat",
+  "experiment_set": "configs/experiment_sets/pso_percase_dense_100.yaml",
+  "algorithms": {"eulc_pso": "configs/algorithms/eulc_pso.yaml"},
+  "passes": 1,
+  "stages": [
+    {"name": "screen", "rounds": 50, "seeds": [0,1,2,3,4,5,6,7,8,9], "tune_coordinates": true},
+    {"name": "refine", "rounds": 200, "seeds": [10,11,12,13,14,15,16,17,18,19], "tune_coordinates": true},
+    {"name": "validate", "rounds": 500,
+     "seeds": [20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49],
+     "tune_coordinates": false}
+  ],
+  "coordinates": {
+    "eulc_pso": [
+      {"name": "budget_pair", "values": [[20,50],[30,50]]},
+      {"name": "inertia", "values": [0.9,0.7,0.4]},
+      {"name": "c1", "values": [2.0,2.5,1.5,1.49445]},
+      {"name": "c2", "values": [2.0,1.5,2.5,1.49445]}
+    ]
+  }
+}

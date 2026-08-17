@@ -1,0 +1,38 @@
+{
+  "experiment_set": "pso_percase_sparse_100",
+  "base_configs": [
+    "configs/base/environment.yaml",
+    "configs/base/channel.yaml",
+    "configs/base/protocol.yaml",
+    "configs/base/execution.yaml",
+    "configs/base/objective.yaml"
+  ],
+  "algorithms": ["configs/algorithms/eulc_pso.yaml"],
+  "mode": "cartesian",
+  "deployment_sizes": [[100, 100, 100]],
+  "densities": ["sparse"],
+  "distributions": ["uniform"],
+  "seeds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+            10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+            20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+            30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+            40, 41, 42, 43, 44, 45, 46, 47, 48, 49],
+  "node_count_mapping": {
+    "100x100x100": {"sparse": 50}
+  },
+  "overrides": {
+    "channel": {
+      "sound_speed_model": "constant",
+      "sound_speed_mps": 1500.0,
+      "transmission_range_m": 150.0
+    },
+    "execution": {
+      "rounds": 500,
+      "stop_on_first_dead": false
+    }
+  },
+  "sweep": {
+    "environment.initial_energy_j": [0.5, 1.0],
+    "environment.packet_size_bits": [4000, 6400]
+  }
+}
