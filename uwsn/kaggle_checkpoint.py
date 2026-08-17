@@ -29,6 +29,8 @@ CHECKPOINT_FILENAMES = {
     "scenario_ofat_trials.jsonl",
     "scenario_ofat_history.jsonl",
     "scenario_best_configs.json",
+    "pso_matrix_manifest.json",
+    "pso_matrix_results.zip",
 }
 
 

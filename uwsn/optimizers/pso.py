@@ -23,6 +23,23 @@ PSO_POSITION_MAX = 1.0
 PSO_VELOCITY_MAX = 1.0
 
 
+def inertia_weight(params: TunableParams, iteration: int) -> float:
+    """Return fixed or linearly decreasing inertia for a one-based iteration."""
+    if params.pso_inertia_schedule == "fixed":
+        return float(params.pso_inertia)
+    if params.pso_inertia_schedule != "linear":
+        raise ValueError(f"Unsupported PSO inertia schedule: {params.pso_inertia_schedule}")
+    if params.pso_iterations <= 1:
+        return float(params.pso_inertia_end)
+    progress = (max(1, min(iteration, params.pso_iterations)) - 1) / (
+        params.pso_iterations - 1
+    )
+    return float(
+        params.pso_inertia_start
+        + progress * (params.pso_inertia_end - params.pso_inertia_start)
+    )
+
+
 def run_pso_cluster_head_selection(
     case: SimulationCase,
     params: TunableParams,
@@ -142,15 +159,19 @@ def run_pso_cluster_head_selection(
 
     for iteration_idx in range(1, params.pso_iterations + 1):
         improved_this_iteration = False
+        current_inertia = inertia_weight(params, iteration_idx)
+        velocity_max = float(params.pso_velocity_max)
+        if not 0.0 < velocity_max <= PSO_VELOCITY_MAX:
+            raise ValueError("pso_velocity_max must be in (0, 1]")
         for i in range(pop_size):
             r1 = rng.random(dims)
             r2 = rng.random(dims)
             velocities[i] = (
-                params.pso_inertia * velocities[i]
+                current_inertia * velocities[i]
                 + params.pso_c1 * r1 * (personal_best[i] - positions_swarm[i])
                 + params.pso_c2 * r2 * (global_best - positions_swarm[i])
             )
-            velocities[i] = np.clip(velocities[i], -PSO_VELOCITY_MAX, PSO_VELOCITY_MAX)
+            velocities[i] = np.clip(velocities[i], -velocity_max, velocity_max)
             positions_swarm[i] = np.clip(
                 positions_swarm[i] + velocities[i],
                 PSO_POSITION_MIN,

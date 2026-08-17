@@ -63,7 +63,8 @@ SECTION_KEYS = {
     },
 }
 OPTIMIZER_PARAMETER_KEYS = {
-    "pso": {"inertia", "c1", "c2", "omega", "stagnation_restart_iterations",
+    "pso": {"inertia", "inertia_schedule", "inertia_start", "inertia_end",
+            "velocity_max", "c1", "c2", "omega", "stagnation_restart_iterations",
             "stagnation_restart_fraction"},
     "ga": {"crossover_rate", "mutation_sigma"},
     "ac_aco": {

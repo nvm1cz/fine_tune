@@ -1,0 +1,31 @@
+{
+  "name": "local_pso_uniform_packet_energy_matrix_v1",
+  "deployment_size_m": [100, 100, 100],
+  "distribution": "uniform",
+  "transmission_range_m": 150.0,
+  "max_simulation_rounds": 500,
+  "densities": [
+    {"name": "sparse", "node_count": 50},
+    {"name": "medium", "node_count": 100},
+    {"name": "dense", "node_count": 150}
+  ],
+  "packet_energy_cases": [
+    {"packet_size_bits": 6400, "initial_energy_j": 1.0},
+    {"packet_size_bits": 6400, "initial_energy_j": 0.5},
+    {"packet_size_bits": 4000, "initial_energy_j": 1.0},
+    {"packet_size_bits": 4000, "initial_energy_j": 0.5}
+  ],
+  "optimizer": {
+    "particle_candidates": [20, 30],
+    "initial_max_iterations": 200,
+    "iteration_candidates": [100, 150, 200],
+    "screen_seeds": 10,
+    "screen_seed_start": 0,
+    "final_seeds": 30,
+    "final_seed_start": 10,
+    "workers": 4,
+    "w_schedules": [[0.9, 0.4], [0.9, 0.2], [1.0, 0.4]],
+    "c_pairs": [[2.0, 2.0], [2.5, 1.5], [1.5, 2.5], [1.49445, 1.49445]],
+    "velocity_max_values": [1.0, 0.2, 0.1]
+  }
+}

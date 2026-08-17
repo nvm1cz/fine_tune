@@ -201,6 +201,14 @@ def build_simulator(
         updates.update({
             "pso_inertia": optimizer_params["inertia"], "pso_c1": optimizer_params["c1"],
             "pso_c2": optimizer_params["c2"], "pso_omega": optimizer_params["omega"],
+            "pso_inertia_schedule": optimizer_params.get("inertia_schedule", "fixed"),
+            "pso_inertia_start": optimizer_params.get(
+                "inertia_start", optimizer_params["inertia"]
+            ),
+            "pso_inertia_end": optimizer_params.get(
+                "inertia_end", optimizer_params["inertia"]
+            ),
+            "pso_velocity_max": optimizer_params.get("velocity_max", 1.0),
             "pso_stagnation_restart_iterations": optimizer_params["stagnation_restart_iterations"],
             "pso_stagnation_restart_fraction": optimizer_params["stagnation_restart_fraction"],
         })

@@ -63,6 +63,11 @@ class TunableParams:
     connectivity_penalty_enabled: bool = True
     pso_stagnation_restart_iterations: int = 5
     pso_stagnation_restart_fraction: float = 0.25
+    # Optional PSO controls. Defaults preserve the historical fixed-inertia path.
+    pso_inertia_schedule: str = "fixed"
+    pso_inertia_start: float = 0.7
+    pso_inertia_end: float = 0.7
+    pso_velocity_max: float = 1.0
     ga_crossover_rate: float = 0.85
     ga_mutation_sigma: float = 0.10
 
