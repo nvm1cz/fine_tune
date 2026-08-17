@@ -95,3 +95,85 @@ For scheduled Kaggle execution, use `run_kaggle_pso_uniform_matrix_tuning.py`.
 Use one notebook and one attached checkpoint Dataset per density. The script
 restores the latest ZIP snapshot, skips completed scenarios, publishes after
 each scenario, and exits cleanly before its wall-time budget when possible.
+
+## Reusing this protocol for another scenario matrix
+
+Treat this file as the mandatory checklist whenever a future request says to
+fine-tune PSO. Do not silently reuse the winning configuration from another
+network state. Create one independent tuning result for every combination of
+deployment size, node count/density, distribution, packet size, initial energy,
+and transmission range.
+
+To define a new matrix:
+
+1. Copy `configs/tuning/local_pso_uniform_matrix.yaml` to a new versioned config.
+2. Change only the scenario dimensions explicitly requested by the experiment:
+   deployment size, density/node mapping, distribution, packet-energy cases,
+   and transmission range.
+3. Keep the sequential tuning rules, seed policy, selection metric, plateau
+   thresholds, diversity gate, baseline, and output schema unchanged unless the
+   user explicitly approves a new protocol version.
+4. Give every scenario a stable ID containing density, node count, packet size,
+   and initial energy. Add further environment fields to the ID when they vary.
+5. Use a separate output directory per scenario. Never pool raw J across
+   scenarios because their network states and normalization denominators differ.
+6. Validate a saved result before skipping it. It is reusable only when its
+   schema/method version, scenario, objective, seed policy, and Git commit are
+   compatible. Preserve incompatible historical results, but do not use them to
+   select the new winner.
+7. After optimizer tuning, run a separate lifetime experiment using the saved
+   `best_config.yaml`; only that later experiment may report FND/HND/LND claims.
+
+## Kaggle notebook template
+
+Use one notebook and one checkpoint Dataset per independent density or other
+manageable scenario group. Attach that Dataset to the notebook before enabling
+scheduled, non-interactive execution. Pin the Git commit so a resumed campaign
+cannot change code midway.
+
+```bash
+%%bash
+set -euxo pipefail
+
+REPO=/kaggle/working/fine_tune
+OUTPUT=/kaggle/working/<OUTPUT_NAME>
+COMMIT=<VERIFIED_GIT_COMMIT>
+
+if [ -d "$REPO/.git" ]; then
+    git -C "$REPO" fetch origin
+else
+    git clone https://github.com/nvm1cz/fine_tune.git "$REPO"
+fi
+
+git -C "$REPO" checkout --detach "$COMMIT"
+cd "$REPO"
+python -m pip install -q -r requirements.txt
+
+python -u scripts/run_kaggle_pso_uniform_matrix_tuning.py \
+    --density <sparse|medium|dense> \
+    --config <MATRIX_CONFIG_PATH> \
+    --output-dir "$OUTPUT" \
+    --checkpoint-dataset <KAGGLE_USERNAME/DATASET_SLUG> \
+    --max-wall-time-seconds 39600 \
+    --execute
+```
+
+Recommended Kaggle settings are: CPU, no accelerator, Internet enabled while
+cloning/installing, and Files-only persistence. A daily schedule may resume the
+checkpoint. Disable the schedule after the manifest reports all scenarios
+complete to avoid unnecessary Dataset versions.
+
+## Completion audit
+
+Before accepting a scenario as tuned, verify all of the following:
+
+- `result.json` has the expected method/schema version and exact scenario;
+- all intermediate candidates have at least 10 independent paired seeds;
+- the final baseline-versus-tuned comparison has 30 paired seeds;
+- rankings use only mean best J for the primary decision;
+- every ranking contains mean best J, standard deviation, and runtime;
+- plateau sensitivity contains all three required threshold/patience settings;
+- diversity contains a measured numeric value and states whether Vmax tuning ran;
+- `best_config.yaml` agrees with the selected rows in the CSV files;
+- convergence PNG and PDF exist;
+- the report explicitly says lifetime validation is still required.
