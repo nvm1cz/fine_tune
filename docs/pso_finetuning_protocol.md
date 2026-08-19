@@ -93,8 +93,12 @@ allows a stopped campaign to resume without rerunning completed scenarios.
 
 For scheduled Kaggle execution, use `run_kaggle_pso_uniform_matrix_tuning.py`.
 Use one notebook and one attached checkpoint Dataset per density. The script
-restores the latest ZIP snapshot, skips completed scenarios, publishes after
-each scenario, and exits cleanly before its wall-time budget when possible.
+restores the latest ZIP snapshot and resumes by the stable key
+`scenario + phase + parameter-label + configuration-hash + seed`. It publishes
+the trial-level checkpoint every four completed trials by default, skips both
+completed trials and completed scenarios, and exits cleanly before its wall-time
+budget when possible. An interruption can therefore repeat at most the small
+unpublished tail, rather than restarting the entire dense scenario.
 
 ## Reusing this protocol for another scenario matrix
 
@@ -154,6 +158,7 @@ python -u scripts/run_kaggle_pso_uniform_matrix_tuning.py \
     --config <MATRIX_CONFIG_PATH> \
     --output-dir "$OUTPUT" \
     --checkpoint-dataset <KAGGLE_USERNAME/DATASET_SLUG> \
+    --checkpoint-every-trials 4 \
     --max-wall-time-seconds 39600 \
     --execute
 ```

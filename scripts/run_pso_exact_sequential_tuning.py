@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import statistics
 import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -24,6 +25,9 @@ from scripts.run_local_pso_sequential_tuning import (
 from uwsn.experiment_config.io import load_yaml, write_yaml
 
 
+METHOD_VERSION = "exact_sequential_pso_initial_state_v2_resumable"
+
+
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     if not rows:
         return
@@ -33,6 +37,18 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         writer.writerows(rows)
     temporary.replace(path)
+
+
+def _read_csv(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _config_hash(config: dict[str, Any]) -> str:
+    encoded = json.dumps(config, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def detect_plateau(values: list[float], threshold: float, patience: int) -> int | None:
@@ -67,27 +83,56 @@ def _evaluate(
     workers: int,
     trials: list[dict[str, Any]],
     curves: list[dict[str, Any]],
+    persist_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
     rows_by_label: dict[str, list[dict[str, Any]]] = {}
     config_by_label = dict(variants)
     for label, config in variants:
-        jobs = [(template, config, seed, phase, label) for seed in seeds]
+        config_hash = _config_hash(config)
+        completed_by_seed = {
+            int(row["seed"]): row for row in trials
+            if row.get("phase") == phase
+            and row.get("label") == label
+            and row.get("config_hash") == config_hash
+        }
+        missing_seeds = [seed for seed in seeds if seed not in completed_by_seed]
+        jobs = [(template, config, seed, phase, label) for seed in missing_seeds]
+        executor: ProcessPoolExecutor | None = None
         if workers > 1:
-            with ProcessPoolExecutor(max_workers=workers) as executor:
-                completed = list(executor.map(lambda_args_run_once, jobs))
+            executor = ProcessPoolExecutor(max_workers=workers)
+            completed = executor.map(lambda_args_run_once, jobs)
         else:
-            completed = [_run_once(*job) for job in jobs]
-        phase_rows = []
-        for index, (summary, convergence) in enumerate(completed, 1):
-            phase_rows.append(summary)
-            trials.append(summary)
-            curves.extend(convergence)
-            print(
-                f"[{phase}] {label} run={index}/{len(seeds)} seed={summary['seed']} "
-                f"D={summary['particle_dimension']} J={summary['best_J']:.9g} "
-                f"runtime={summary['runtime_seconds']:.2f}s",
-                flush=True,
-            )
+            completed = (_run_once(*job) for job in jobs)
+        try:
+            for seed, (summary, convergence) in zip(missing_seeds, completed):
+                summary["config_hash"] = config_hash
+                for row in convergence:
+                    row["config_hash"] = config_hash
+                trials.append(summary)
+                curves.extend(convergence)
+                completed_by_seed[seed] = summary
+                print(
+                    f"[{phase}] {label} completed={len(completed_by_seed)}/{len(seeds)} "
+                    f"seed={summary['seed']} "
+                    f"D={summary['particle_dimension']} J={summary['best_J']:.9g} "
+                    f"runtime={summary['runtime_seconds']:.2f}s",
+                    flush=True,
+                )
+                if persist_callback is not None:
+                    persist_callback({
+                        "phase": phase,
+                        "label": label,
+                        "seed": seed,
+                        "config_hash": config_hash,
+                        "completed_for_variant": len(completed_by_seed),
+                        "total_for_variant": len(seeds),
+                    })
+        finally:
+            if executor is not None:
+                executor.shutdown(wait=True, cancel_futures=True)
+        phase_rows = [completed_by_seed[seed] for seed in seeds]
+        if not missing_seeds:
+            print(f"[resume] {phase} {label} already has {len(seeds)}/{len(seeds)} seeds", flush=True)
         rows_by_label[label] = phase_rows
 
     rankings = []
@@ -197,8 +242,57 @@ def _plot_final(curves: list[dict[str, Any]], output: Path) -> None:
     plt.close()
 
 
-def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
+def run_exact(
+    spec_path: Path,
+    output: Path,
+    checkpoint_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     spec = load_yaml(spec_path)
+    spec_hash = hashlib.sha256(
+        json.dumps(spec, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    output.mkdir(parents=True, exist_ok=True)
+    resume_path = output / "resume_state.json"
+    resume_state: dict[str, Any] = {}
+    if resume_path.exists():
+        try:
+            candidate = json.loads(resume_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            candidate = {}
+        if (
+            candidate.get("method_version") == METHOD_VERSION
+            and candidate.get("spec_hash") == spec_hash
+        ):
+            resume_state = candidate
+    if resume_state:
+        trials = _read_csv(output / "trials.csv")
+        curves = _read_csv(output / "convergence.csv")
+        print(
+            f"[resume] loaded {len(trials)} completed trials for {spec['name']}",
+            flush=True,
+        )
+    else:
+        trials = []
+        curves = []
+
+    def persist_trial(progress: dict[str, Any]) -> None:
+        _write_csv(output / "trials.csv", trials)
+        _write_csv(output / "convergence.csv", curves)
+        state = {
+            "schema_version": 1,
+            "method_version": METHOD_VERSION,
+            "spec_hash": spec_hash,
+            "scenario_name": spec["name"],
+            "completed_trial_count": len(trials),
+            "active_progress": progress,
+            "completed": False,
+        }
+        temporary = resume_path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(resume_path)
+        if checkpoint_callback is not None:
+            checkpoint_callback(dict(state))
+
     template = _case_template(spec)
     template["execution"]["rounds"] = 1
     template["execution"]["stop_on_first_dead"] = False
@@ -212,8 +306,6 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
     final_start = int(optimizer.get("final_seed_start", 10))
     final_seeds = list(range(final_start, final_start + int(optimizer["final_seeds"])))
     workers = int(optimizer.get("workers", 1))
-    trials: list[dict[str, Any]] = []
-    curves: list[dict[str, Any]] = []
     ranking_rows: list[dict[str, Any]] = []
     winners: list[dict[str, Any]] = []
 
@@ -227,7 +319,7 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
     probe, probe_winner, rows = _evaluate(
         template, "step0_dimension_probe",
         [("probe_N20", config(20, 50, "fixed", 0.9, 0.9, 2.0, 2.0, 1.0))],
-        screen_seeds, workers, trials, curves,
+        screen_seeds, workers, trials, curves, persist_trial,
     )
     ranking_rows.extend(rows); winners.append(probe_winner)
     mean_dimension = float(probe_winner["mean_particle_dimension"])
@@ -239,7 +331,8 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
         for start, end in optimizer["w_schedules"]
     ]
     selected, winner, rows = _evaluate(
-        template, "step1_inertia", w_variants, screen_seeds, workers, trials, curves
+        template, "step1_inertia", w_variants, screen_seeds, workers, trials, curves,
+        persist_trial,
     )
     ranking_rows.extend(rows); winners.append(winner)
     selected_params = selected["optimizer"]["params"]
@@ -253,7 +346,8 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
         ),
     ) for c1, c2 in optimizer["c_pairs"]]
     selected, winner, rows = _evaluate(
-        template, "step2_acceleration", c_variants, screen_seeds, workers, trials, curves
+        template, "step2_acceleration", c_variants, screen_seeds, workers, trials, curves,
+        persist_trial,
     )
     ranking_rows.extend(rows); winners.append(winner)
     selected_params = selected["optimizer"]["params"]
@@ -273,7 +367,7 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
     ) for n in optimizer["population_candidates_step3"]]
     selected, winner, rows = _evaluate(
         template, "step3_population_iterations", n_variants,
-        screen_seeds, workers, trials, curves,
+        screen_seeds, workers, trials, curves, persist_trial,
     )
     # Required practical trade-off: below 0.1% J improvement, prefer lower runtime.
     best_mean = min(float(row["mean_best_J"]) for row in rows)
@@ -323,7 +417,8 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
             ),
         ) for vmax in optimizer["velocity_max_values"]]
         tuned, winner, rows = _evaluate(
-            template, "step4_vmax", vmax_variants, screen_seeds, workers, trials, curves
+            template, "step4_vmax", vmax_variants, screen_seeds, workers, trials, curves,
+            persist_trial,
         )
         ranking_rows.extend(rows); winners.append(winner)
     else:
@@ -336,7 +431,7 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
     baseline = config(30, 50, "fixed", 0.9, 0.9, 2.0, 2.0, 1.0)
     _, final_winner, rows = _evaluate(
         template, "step5_final", [("baseline", baseline), ("tuned", tuned)],
-        final_seeds, workers, trials, curves,
+        final_seeds, workers, trials, curves, persist_trial,
     )
     ranking_rows.extend(rows); winners.append(final_winner)
 
@@ -359,7 +454,6 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
             "median_convergence_iteration": statistics.median(plateau_values) if plateau_values else None,
         })
 
-    output.mkdir(parents=True, exist_ok=True)
     _write_csv(output / "trials.csv", trials)
     _write_csv(output / "convergence.csv", curves)
     _write_csv(output / "all_step_rankings.csv", ranking_rows)
@@ -382,7 +476,7 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
     write_yaml(output / "best_config.yaml", tuned)
     result = {
         "schema_version": 3,
-        "method_version": "exact_sequential_pso_initial_state_v1",
+        "method_version": METHOD_VERSION,
         "scenario": spec["scenario"],
         "scope": "optimizer tuning at initial network state only",
         "lifetime_validation_required": True,
@@ -435,6 +529,20 @@ def run_exact(spec_path: Path, output: Path) -> dict[str, Any]:
     ])
     (output / "selection_explanation.md").write_text("\n".join(explanation) + "\n", encoding="utf-8")
     _plot_final(curves, output)
+    final_resume_state = {
+        "schema_version": 1,
+        "method_version": METHOD_VERSION,
+        "spec_hash": spec_hash,
+        "scenario_name": spec["name"],
+        "completed_trial_count": len(trials),
+        "active_progress": None,
+        "completed": True,
+    }
+    temporary = resume_path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(final_resume_state, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(resume_path)
+    if checkpoint_callback is not None:
+        checkpoint_callback(dict(final_resume_state))
     print(json.dumps(result, indent=2), flush=True)
     return result
 

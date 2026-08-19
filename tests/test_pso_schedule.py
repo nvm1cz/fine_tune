@@ -1,9 +1,10 @@
 import unittest
 from dataclasses import replace
+from unittest.mock import patch
 
 import numpy as np
 
-from scripts.run_pso_exact_sequential_tuning import detect_plateau
+from scripts.run_pso_exact_sequential_tuning import _evaluate, detect_plateau
 from uwsn.optimizers.pso import inertia_weight, swarm_diversity_metrics
 from uwsn.run_config import SIMULATION_PARAMS
 
@@ -47,6 +48,39 @@ class PSOInertiaScheduleTests(unittest.TestCase):
         normalized, equivalent = swarm_diversity_metrics(swarm, 100.0)
         self.assertAlmostEqual(normalized, 0.5)
         self.assertAlmostEqual(equivalent, 50.0)
+
+    def test_trial_level_resume_skips_completed_phase_label_seed(self) -> None:
+        trials = []
+        curves = []
+        config = {"optimizer": {"population_size": 20, "params": {"inertia": 0.9}}}
+
+        def fake_run(template, algorithm_config, seed, phase, label):
+            return ({
+                "phase": phase,
+                "label": label,
+                "seed": seed,
+                "best_J": 1.0 + seed,
+                "runtime_seconds": 0.1,
+                "particle_dimension": 5,
+            }, [{
+                "phase": phase,
+                "label": label,
+                "seed": seed,
+                "iteration": 0,
+                "best_J": 1.0 + seed,
+            }])
+
+        with patch(
+            "scripts.run_pso_exact_sequential_tuning._run_once",
+            side_effect=fake_run,
+        ) as run_once:
+            _evaluate({}, "step", [("candidate", config)], [0, 1], 1, trials, curves)
+            self.assertEqual(run_once.call_count, 2)
+            _evaluate({}, "step", [("candidate", config)], [0, 1], 1, trials, curves)
+            self.assertEqual(run_once.call_count, 2)
+
+        self.assertEqual(len(trials), 2)
+        self.assertEqual(len(curves), 2)
 
 
 if __name__ == "__main__":

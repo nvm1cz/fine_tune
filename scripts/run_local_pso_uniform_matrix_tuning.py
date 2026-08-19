@@ -24,7 +24,10 @@ def _is_exact_result(path: Path) -> bool:
         return False
     return (
         result.get("schema_version") == 3
-        and result.get("method_version") == "exact_sequential_pso_initial_state_v1"
+        and result.get("method_version") in {
+            "exact_sequential_pso_initial_state_v1",
+            "exact_sequential_pso_initial_state_v2_resumable",
+        }
         and result.get("scope") == "optimizer tuning at initial network state only"
     )
 
