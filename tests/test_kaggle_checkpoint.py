@@ -56,6 +56,31 @@ class KaggleDatasetCheckpointTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             KaggleDatasetCheckpoint("missing-owner")
 
+    def test_restore_can_pin_a_historical_dataset_version(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote"
+            output = root / "output"
+            remote.mkdir()
+            (remote / "pso_matrix_manifest.json").write_text("{}")
+            handles = []
+
+            def download(handle, **kwargs):
+                handles.append(handle)
+                return str(remote)
+
+            checkpoint = KaggleDatasetCheckpoint(
+                "owner/checkpoint",
+                download_fn=download,
+                upload_fn=lambda *args, **kwargs: None,
+            )
+            checkpoint.restore(output, version=278)
+            self.assertEqual(handles, ["owner/checkpoint/versions/278"])
+            self.assertTrue((output / "pso_matrix_manifest.json").exists())
+
+            with self.assertRaisesRegex(ValueError, "positive integer"):
+                checkpoint.restore(output, version=0)
+
     def test_production_backend_disables_notebook_attach_resolver(self) -> None:
         fake = types.SimpleNamespace(
             dataset_download=lambda *args, **kwargs: "downloaded",

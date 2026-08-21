@@ -76,12 +76,18 @@ class KaggleDatasetCheckpoint:
             or path.name.startswith("scenario_registry_") and path.suffix in {".csv", ".json"}
         )
 
-    def restore(self, output_dir: Path) -> list[str]:
+    def restore(self, output_dir: Path, *, version: int | None = None) -> list[str]:
         download, _ = self._backend()
+        source_handle = (
+            self.handle if version is None
+            else f"{self.handle}/versions/{int(version)}"
+        )
+        if version is not None and int(version) <= 0:
+            raise ValueError("checkpoint version must be a positive integer")
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(
                 download(
-                    self.handle,
+                    source_handle,
                     output_dir=temporary,
                     force_download=True,
                 )
@@ -93,7 +99,7 @@ class KaggleDatasetCheckpoint:
                     shutil.copy2(path, output_dir / path.name)
                     restored.append(path.name)
         print(
-            f"[checkpoint] restored {len(restored)} file(s) from {self.handle}",
+            f"[checkpoint] restored {len(restored)} file(s) from {source_handle}",
             flush=True,
         )
         return sorted(restored)

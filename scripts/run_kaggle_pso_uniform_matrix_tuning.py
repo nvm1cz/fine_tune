@@ -94,6 +94,10 @@ def main() -> None:
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--checkpoint-dataset", required=True)
+    parser.add_argument(
+        "--restore-version", type=int,
+        help="One-time recovery: restore this historical Dataset version, then publish to the base Dataset.",
+    )
     parser.add_argument("--max-wall-time-seconds", type=int, default=39600)
     parser.add_argument("--checkpoint-every-trials", type=int, default=4)
     parser.add_argument("--execute", action="store_true")
@@ -106,7 +110,7 @@ def main() -> None:
     output = args.output_dir
     output.mkdir(parents=True, exist_ok=True)
     checkpoint = KaggleDatasetCheckpoint(args.checkpoint_dataset)
-    checkpoint.restore(output)
+    checkpoint.restore(output, version=args.restore_version)
     archive_path = output / "pso_matrix_results.zip"
     if archive_path.exists():
         with zipfile.ZipFile(archive_path) as archive:

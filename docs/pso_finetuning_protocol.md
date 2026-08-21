@@ -168,6 +168,11 @@ cloning/installing, and Files-only persistence. A daily schedule may resume the
 checkpoint. Disable the schedule after the manifest reports all scenarios
 complete to avoid unnecessary Dataset versions.
 
+If a stale overlapping session publishes an older state, recover the last good
+Dataset version once with `--restore-version VERSION_NUMBER`. The recovered
+snapshot is then published back to the unversioned Dataset handle. Remove this
+option from later scheduled runs so they resume the newest recovered version.
+
 ## Completion audit
 
 Before accepting a scenario as tuned, verify all of the following:
