@@ -3,6 +3,7 @@ import sys
 import tempfile
 import types
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -80,6 +81,31 @@ class KaggleDatasetCheckpointTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "positive integer"):
                 checkpoint.restore(output, version=0)
+
+    def test_restore_rebuilds_zip_when_kaggle_expands_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote"
+            expanded = remote / "pso_matrix_results"
+            scenario = expanded / "dense_n150_p6400_e1p0"
+            scenario.mkdir(parents=True)
+            (scenario / "result.json").write_text('{"schema_version":3}')
+            (expanded / "pso_matrix_manifest.json").write_text(
+                '{"completed_count":3}'
+            )
+            output = root / "output"
+
+            checkpoint = KaggleDatasetCheckpoint(
+                "owner/checkpoint",
+                download_fn=lambda *args, **kwargs: str(remote),
+                upload_fn=lambda *args, **kwargs: None,
+            )
+            restored = checkpoint.restore(output, version=278)
+            self.assertIn("pso_matrix_results.zip", restored)
+            with zipfile.ZipFile(output / "pso_matrix_results.zip") as archive:
+                self.assertIn(
+                    "dense_n150_p6400_e1p0/result.json", archive.namelist()
+                )
 
     def test_production_backend_disables_notebook_attach_resolver(self) -> None:
         fake = types.SimpleNamespace(

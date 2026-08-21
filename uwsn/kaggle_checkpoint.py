@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import time
+import zipfile
 from pathlib import Path
 from typing import Callable
 
@@ -98,6 +99,26 @@ class KaggleDatasetCheckpoint:
                 if path.is_file() and self._is_artifact(path):
                     shutil.copy2(path, output_dir / path.name)
                     restored.append(path.name)
+            # Kaggle may automatically expand an uploaded ZIP and expose it as
+            # a directory with the archive stem. Rebuild the original archive
+            # so callers get the same checkpoint layout in interactive and
+            # scheduled sessions.
+            archive_path = output_dir / "pso_matrix_results.zip"
+            expanded_candidates = (
+                [source] if source.name == "pso_matrix_results"
+                else [path for path in source.rglob("pso_matrix_results") if path.is_dir()]
+            )
+            if not archive_path.exists() and expanded_candidates:
+                expanded = expanded_candidates[0]
+                temporary_archive = archive_path.with_suffix(".zip.tmp")
+                with zipfile.ZipFile(
+                    temporary_archive, "w", compression=zipfile.ZIP_DEFLATED
+                ) as archive:
+                    for path in sorted(expanded.rglob("*")):
+                        if path.is_file():
+                            archive.write(path, path.relative_to(expanded))
+                temporary_archive.replace(archive_path)
+                restored.append(archive_path.name)
         print(
             f"[checkpoint] restored {len(restored)} file(s) from {source_handle}",
             flush=True,
