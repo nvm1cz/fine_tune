@@ -1,0 +1,1836 @@
+{
+  "schema_version": 1,
+  "selection_rule": "final step winner: baseline or tuned by mean best_J workflow",
+  "scope": "PSO tuning at initial network state; lifetime validation pending",
+  "scenarios": {
+    "medium_n100_p4000_e0p5": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "medium",
+        "node_count": 100,
+        "distribution": "uniform",
+        "packet_size_bits": 4000,
+        "initial_energy_j": 0.5,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "baseline",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 38,
+          "fitness_evaluation_budget": 1950,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.30691990170723893,
+        "tuned_mean_best_J": 0.3074422774800939,
+        "selected_mean_best_J": 0.30691990170723893,
+        "selected_std_best_J": 0.008390301317405225,
+        "selected_runtime_seconds": 86.17935672153332
+      },
+      "provenance": {
+        "archive_density": "medium",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 180
+      }
+    },
+    "medium_n100_p4000_e1p0": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "medium",
+        "node_count": 100,
+        "distribution": "uniform",
+        "packet_size_bits": 4000,
+        "initial_energy_j": 1.0,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "baseline",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 38,
+          "fitness_evaluation_budget": 1950,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.20804086417404954,
+        "tuned_mean_best_J": 0.20839494843707573,
+        "selected_mean_best_J": 0.20804086417404954,
+        "selected_std_best_J": 0.005687234770294033,
+        "selected_runtime_seconds": 86.17299537519975
+      },
+      "provenance": {
+        "archive_density": "medium",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 180
+      }
+    },
+    "medium_n100_p6400_e0p5": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "medium",
+        "node_count": 100,
+        "distribution": "uniform",
+        "packet_size_bits": 6400,
+        "initial_energy_j": 0.5,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "baseline",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 38,
+          "fitness_evaluation_budget": 1950,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.40070936024911186,
+        "tuned_mean_best_J": 0.401391481059994,
+        "selected_mean_best_J": 0.40070936024911186,
+        "selected_std_best_J": 0.010806749594776635,
+        "selected_runtime_seconds": 84.52419165053328
+      },
+      "provenance": {
+        "archive_density": "medium",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 180
+      }
+    },
+    "medium_n100_p6400_e1p0": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "medium",
+        "node_count": 100,
+        "distribution": "uniform",
+        "packet_size_bits": 6400,
+        "initial_energy_j": 1.0,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "baseline",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 38,
+          "fitness_evaluation_budget": 1950,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.2716145845365919,
+        "tuned_mean_best_J": 0.2720769494799311,
+        "selected_mean_best_J": 0.2716145845365919,
+        "selected_std_best_J": 0.007325186512933776,
+        "selected_runtime_seconds": 84.96246150270001
+      },
+      "provenance": {
+        "archive_density": "medium",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 180
+      }
+    },
+    "dense_n150_p4000_e0p5": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "dense",
+        "node_count": 150,
+        "distribution": "uniform",
+        "packet_size_bits": 4000,
+        "initial_energy_j": 0.5,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.2772758612779352,
+        "tuned_mean_best_J": 0.2755891760715122,
+        "selected_mean_best_J": 0.2755891760715122,
+        "selected_std_best_J": 0.005911609613378232,
+        "selected_runtime_seconds": 591.1796297655667
+      },
+      "provenance": {
+        "archive_density": "dense",
+        "method_version": "exact_sequential_pso_initial_state_v2_resumable",
+        "unique_trial_count": 180
+      }
+    },
+    "dense_n150_p4000_e1p0": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "dense",
+        "node_count": 150,
+        "distribution": "uniform",
+        "packet_size_bits": 4000,
+        "initial_energy_j": 1.0,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.18794711413060344,
+        "tuned_mean_best_J": 0.18680382089361808,
+        "selected_mean_best_J": 0.18680382089361808,
+        "selected_std_best_J": 0.004007092292587546,
+        "selected_runtime_seconds": 371.35125146926606
+      },
+      "provenance": {
+        "archive_density": "dense",
+        "method_version": "exact_sequential_pso_initial_state_v2_resumable",
+        "unique_trial_count": 180
+      }
+    },
+    "dense_n150_p6400_e0p5": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "dense",
+        "node_count": 150,
+        "distribution": "uniform",
+        "packet_size_bits": 6400,
+        "initial_energy_j": 0.5,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.36218697934688915,
+        "tuned_mean_best_J": 0.3601135170118475,
+        "selected_mean_best_J": 0.3601135170118475,
+        "selected_std_best_J": 0.007626157223036885,
+        "selected_runtime_seconds": 366.1406475046333
+      },
+      "provenance": {
+        "archive_density": "dense",
+        "method_version": "exact_sequential_pso_initial_state_v2_resumable",
+        "unique_trial_count": 210
+      }
+    },
+    "dense_n150_p6400_e1p0": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "dense",
+        "node_count": 150,
+        "distribution": "uniform",
+        "packet_size_bits": 6400,
+        "initial_energy_j": 1.0,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 50,
+          "max_iterations": 39,
+          "fitness_evaluation_budget": 2000,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.2455027899996786,
+        "tuned_mean_best_J": 0.24409732592387395,
+        "selected_mean_best_J": 0.24409732592387395,
+        "selected_std_best_J": 0.005169271624702824,
+        "selected_runtime_seconds": 366.52866822886665
+      },
+      "provenance": {
+        "archive_density": "dense",
+        "method_version": "exact_sequential_pso_initial_state_v2_resumable",
+        "unique_trial_count": 210
+      }
+    },
+    "sparse_n50_p4000_e0p5": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "sparse",
+        "node_count": 50,
+        "distribution": "uniform",
+        "packet_size_bits": 4000,
+        "initial_energy_j": 0.5,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 0.2
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 0.2
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.34656664936632164,
+        "tuned_mean_best_J": 0.34656664936632164,
+        "selected_mean_best_J": 0.34656664936632164,
+        "selected_std_best_J": 0.01457434410528972,
+        "selected_runtime_seconds": 2.859986774866684
+      },
+      "provenance": {
+        "archive_density": "sparse",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 210
+      }
+    },
+    "sparse_n50_p4000_e1p0": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "sparse",
+        "node_count": 50,
+        "distribution": "uniform",
+        "packet_size_bits": 4000,
+        "initial_energy_j": 1.0,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 0.9,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 0.9,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.2349147931649298,
+        "tuned_mean_best_J": 0.2349147931649298,
+        "selected_mean_best_J": 0.2349147931649298,
+        "selected_std_best_J": 0.009878991637433688,
+        "selected_runtime_seconds": 2.9091926328000226
+      },
+      "provenance": {
+        "archive_density": "sparse",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 180
+      }
+    },
+    "sparse_n50_p6400_e0p5": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "sparse",
+        "node_count": 50,
+        "distribution": "uniform",
+        "packet_size_bits": 6400,
+        "initial_energy_j": 0.5,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 1.0,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 1.0,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.4524883120896477,
+        "tuned_mean_best_J": 0.4525280310242705,
+        "selected_mean_best_J": 0.4525280310242705,
+        "selected_std_best_J": 0.01887719685688927,
+        "selected_runtime_seconds": 2.9398019434000124
+      },
+      "provenance": {
+        "archive_density": "sparse",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 210
+      }
+    },
+    "sparse_n50_p6400_e1p0": {
+      "scenario": {
+        "deployment_size_m": [
+          100,
+          100,
+          100
+        ],
+        "density": "sparse",
+        "node_count": 50,
+        "distribution": "uniform",
+        "packet_size_bits": 6400,
+        "initial_energy_j": 1.0,
+        "transmission_range_m": 150.0
+      },
+      "selected_source": "tuned",
+      "selected_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 0.9,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "baseline_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 50,
+          "fitness_evaluation_budget": 1530,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.0,
+            "c2": 2.0,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "fixed",
+            "inertia_start": 0.9,
+            "inertia_end": 0.9,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "tuned_config": {
+        "algorithm": {
+          "id": "eulc_pso",
+          "family": "eulc_optimized",
+          "base_protocol": "eulc",
+          "optimizer": "pso"
+        },
+        "protocol": {
+          "initial_layer_width_m": 20.0,
+          "layer_spacing_increment_m": 10.0,
+          "competition_radius_mode": "dynamic_eulc",
+          "competition_adjustment_factor": 0.5,
+          "recluster_interval_rounds": 1,
+          "ch_ratio": 0.05,
+          "candidate_ratio": 0.2
+        },
+        "eulc": {
+          "alpha": 0.4,
+          "beta": 0.4,
+          "gamma": 0.2
+        },
+        "optimizer": {
+          "name": "pso",
+          "population_size": 30,
+          "max_iterations": 27,
+          "fitness_evaluation_budget": 840,
+          "stopping_criterion": "max_iterations",
+          "params": {
+            "inertia": 0.9,
+            "c1": 2.5,
+            "c2": 1.5,
+            "omega": 0.65,
+            "stagnation_restart_iterations": 5,
+            "stagnation_restart_fraction": 0.25,
+            "inertia_schedule": "linear",
+            "inertia_start": 0.9,
+            "inertia_end": 0.4,
+            "velocity_max": 1.0
+          }
+        }
+      },
+      "final_metrics": {
+        "baseline_mean_best_J": 0.3067121387410287,
+        "tuned_mean_best_J": 0.3067121387410287,
+        "selected_mean_best_J": 0.3067121387410287,
+        "selected_std_best_J": 0.012815142126283482,
+        "selected_runtime_seconds": 2.9205235909999905
+      },
+      "provenance": {
+        "archive_density": "sparse",
+        "method_version": "exact_sequential_pso_initial_state_v1",
+        "unique_trial_count": 180
+      }
+    }
+  },
+  "sources": {
+    "medium": {
+      "archive_name": "archive.zip",
+      "archive_sha256": "95f82cc934f00b32a1a7bf3d780e3b5d6f6019c56da73d549dd9af3639a0f930",
+      "result_count": 4
+    },
+    "dense": {
+      "archive_name": "archive (1).zip",
+      "archive_sha256": "7674f4d1c23f58230809e39030fc18e91bbc81e3a7b498ccf697a0ef341735f3",
+      "result_count": 4
+    },
+    "sparse": {
+      "archive_name": "archive (2).zip",
+      "archive_sha256": "5859ba82a7f093cbffd2175546daeb3ff70fb11472e585d4239c24e8217620a8",
+      "result_count": 4
+    }
+  }
+}

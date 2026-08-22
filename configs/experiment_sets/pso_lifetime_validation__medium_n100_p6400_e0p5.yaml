@@ -1,0 +1,82 @@
+{
+  "experiment_set": "lifetime_validation_medium_n100_p6400_e0p5_500r",
+  "base_configs": [
+    "configs/base/environment.yaml",
+    "configs/base/channel.yaml",
+    "configs/base/protocol.yaml",
+    "configs/base/execution.yaml",
+    "configs/base/objective.yaml"
+  ],
+  "algorithms": [],
+  "mode": "cartesian",
+  "deployment_sizes": [
+    [
+      100,
+      100,
+      100
+    ]
+  ],
+  "densities": [
+    "medium"
+  ],
+  "distributions": [
+    "uniform"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29
+  ],
+  "node_count_mapping": {
+    "100x100x100": {
+      "medium": 100
+    }
+  },
+  "overrides": {
+    "environment": {
+      "initial_energy_j": 0.5,
+      "packet_size_bits": 6400
+    },
+    "channel": {
+      "transmission_range_m": 150.0,
+      "sound_speed_model": "constant",
+      "sound_speed_mps": 1500.0
+    },
+    "execution": {
+      "rounds": 500,
+      "stop_on_first_dead": false
+    },
+    "output": {
+      "save_round_metrics": true,
+      "save_convergence": true
+    }
+  },
+  "sweep": {}
+}
