@@ -53,6 +53,22 @@ class KaggleDatasetCheckpointTests(unittest.TestCase):
             )
             self.assertEqual(uploads[0]["note"], "screen 1/10")
 
+    def test_restore_prefers_attached_dataset_without_http_download(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            attached = root / "attached"
+            output = root / "output"
+            attached.mkdir()
+            (attached / "pso_lifetime_campaign_manifest.json").write_text("{}")
+            checkpoint = KaggleDatasetCheckpoint(
+                "owner/checkpoint",
+                download_fn=lambda *args, **kwargs: self.fail("HTTP download should not run"),
+                upload_fn=lambda *args, **kwargs: None,
+            )
+            with patch.object(checkpoint, "_attached_source", return_value=attached):
+                restored = checkpoint.restore(output)
+            self.assertEqual(restored, ["pso_lifetime_campaign_manifest.json"])
+
     def test_invalid_handle_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             KaggleDatasetCheckpoint("missing-owner")

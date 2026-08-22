@@ -79,14 +79,58 @@ class KaggleDatasetCheckpoint:
             or path.name.startswith("scenario_registry_") and path.suffix in {".csv", ".json"}
         )
 
+    def _attached_source(self) -> Path | None:
+        owner, slug = self.handle.split("/")
+        candidates = (
+            Path("/kaggle/input/datasets") / owner / slug,
+            Path("/kaggle/input") / slug,
+        )
+        return next((path for path in candidates if path.exists()), None)
+
+    def _restore_source(self, source: Path, output_dir: Path) -> list[str]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        restored = []
+        for path in source.rglob("*"):
+            if path.is_file() and self._is_artifact(path):
+                shutil.copy2(path, output_dir / path.name)
+                restored.append(path.name)
+        # Kaggle may automatically expand an uploaded ZIP and expose it as a
+        # directory with the archive stem. Rebuild the original archive.
+        for stem in ("pso_matrix_results", "pso_lifetime_results"):
+            archive_path = output_dir / f"{stem}.zip"
+            expanded_candidates = (
+                [source] if source.name == stem
+                else [path for path in source.rglob(stem) if path.is_dir()]
+            )
+            if not archive_path.exists() and expanded_candidates:
+                expanded = expanded_candidates[0]
+                temporary_archive = archive_path.with_suffix(".zip.tmp")
+                with zipfile.ZipFile(
+                    temporary_archive, "w", compression=zipfile.ZIP_DEFLATED
+                ) as archive:
+                    for path in sorted(expanded.rglob("*")):
+                        if path.is_file():
+                            archive.write(path, path.relative_to(expanded))
+                temporary_archive.replace(archive_path)
+                restored.append(archive_path.name)
+        return restored
+
     def restore(self, output_dir: Path, *, version: int | None = None) -> list[str]:
-        download, _ = self._backend()
         source_handle = (
             self.handle if version is None
             else f"{self.handle}/versions/{int(version)}"
         )
         if version is not None and int(version) <= 0:
             raise ValueError("checkpoint version must be a positive integer")
+        attached = self._attached_source() if version is None else None
+        if attached is not None:
+            restored = self._restore_source(attached, output_dir)
+            print(
+                f"[checkpoint] restored {len(restored)} file(s) from attached {self.handle}",
+                flush=True,
+            )
+            return sorted(restored)
+        download, _ = self._backend()
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(
                 download(
@@ -95,33 +139,7 @@ class KaggleDatasetCheckpoint:
                     force_download=True,
                 )
             )
-            output_dir.mkdir(parents=True, exist_ok=True)
-            restored = []
-            for path in source.rglob("*"):
-                if path.is_file() and self._is_artifact(path):
-                    shutil.copy2(path, output_dir / path.name)
-                    restored.append(path.name)
-            # Kaggle may automatically expand an uploaded ZIP and expose it as
-            # a directory with the archive stem. Rebuild the original archive
-            # so callers get the same checkpoint layout in interactive and
-            # scheduled sessions.
-            for stem in ("pso_matrix_results", "pso_lifetime_results"):
-                archive_path = output_dir / f"{stem}.zip"
-                expanded_candidates = (
-                    [source] if source.name == stem
-                    else [path for path in source.rglob(stem) if path.is_dir()]
-                )
-                if not archive_path.exists() and expanded_candidates:
-                    expanded = expanded_candidates[0]
-                    temporary_archive = archive_path.with_suffix(".zip.tmp")
-                    with zipfile.ZipFile(
-                        temporary_archive, "w", compression=zipfile.ZIP_DEFLATED
-                    ) as archive:
-                        for path in sorted(expanded.rglob("*")):
-                            if path.is_file():
-                                archive.write(path, path.relative_to(expanded))
-                    temporary_archive.replace(archive_path)
-                    restored.append(archive_path.name)
+            restored = self._restore_source(source, output_dir)
         print(
             f"[checkpoint] restored {len(restored)} file(s) from {source_handle}",
             flush=True,
