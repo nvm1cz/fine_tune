@@ -75,7 +75,7 @@
     },
     "output": {
       "save_round_metrics": true,
-      "save_convergence": true
+      "save_convergence": false
     }
   },
   "sweep": {}

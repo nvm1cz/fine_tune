@@ -107,6 +107,28 @@ class KaggleDatasetCheckpointTests(unittest.TestCase):
                     "dense_n150_p6400_e1p0/result.json", archive.namelist()
                 )
 
+    def test_restore_rebuilds_expanded_lifetime_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote"
+            expanded = remote / "pso_lifetime_results"
+            job = expanded / "sparse_case" / "selected"
+            job.mkdir(parents=True)
+            (job / "benchmark_results.jsonl").write_text("{}\n")
+            output = root / "output"
+            checkpoint = KaggleDatasetCheckpoint(
+                "owner/checkpoint",
+                download_fn=lambda *args, **kwargs: str(remote),
+                upload_fn=lambda *args, **kwargs: None,
+            )
+            restored = checkpoint.restore(output)
+            self.assertIn("pso_lifetime_results.zip", restored)
+            with zipfile.ZipFile(output / "pso_lifetime_results.zip") as archive:
+                self.assertIn(
+                    "sparse_case/selected/benchmark_results.jsonl",
+                    archive.namelist(),
+                )
+
     def test_production_backend_disables_notebook_attach_resolver(self) -> None:
         fake = types.SimpleNamespace(
             dataset_download=lambda *args, **kwargs: "downloaded",

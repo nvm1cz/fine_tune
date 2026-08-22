@@ -32,6 +32,8 @@ CHECKPOINT_FILENAMES = {
     "scenario_best_configs.json",
     "pso_matrix_manifest.json",
     "pso_matrix_results.zip",
+    "pso_lifetime_campaign_manifest.json",
+    "pso_lifetime_results.zip",
 }
 
 
@@ -103,22 +105,23 @@ class KaggleDatasetCheckpoint:
             # a directory with the archive stem. Rebuild the original archive
             # so callers get the same checkpoint layout in interactive and
             # scheduled sessions.
-            archive_path = output_dir / "pso_matrix_results.zip"
-            expanded_candidates = (
-                [source] if source.name == "pso_matrix_results"
-                else [path for path in source.rglob("pso_matrix_results") if path.is_dir()]
-            )
-            if not archive_path.exists() and expanded_candidates:
-                expanded = expanded_candidates[0]
-                temporary_archive = archive_path.with_suffix(".zip.tmp")
-                with zipfile.ZipFile(
-                    temporary_archive, "w", compression=zipfile.ZIP_DEFLATED
-                ) as archive:
-                    for path in sorted(expanded.rglob("*")):
-                        if path.is_file():
-                            archive.write(path, path.relative_to(expanded))
-                temporary_archive.replace(archive_path)
-                restored.append(archive_path.name)
+            for stem in ("pso_matrix_results", "pso_lifetime_results"):
+                archive_path = output_dir / f"{stem}.zip"
+                expanded_candidates = (
+                    [source] if source.name == stem
+                    else [path for path in source.rglob(stem) if path.is_dir()]
+                )
+                if not archive_path.exists() and expanded_candidates:
+                    expanded = expanded_candidates[0]
+                    temporary_archive = archive_path.with_suffix(".zip.tmp")
+                    with zipfile.ZipFile(
+                        temporary_archive, "w", compression=zipfile.ZIP_DEFLATED
+                    ) as archive:
+                        for path in sorted(expanded.rglob("*")):
+                            if path.is_file():
+                                archive.write(path, path.relative_to(expanded))
+                    temporary_archive.replace(archive_path)
+                    restored.append(archive_path.name)
         print(
             f"[checkpoint] restored {len(restored)} file(s) from {source_handle}",
             flush=True,

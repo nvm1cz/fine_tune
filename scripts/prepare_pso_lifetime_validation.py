@@ -64,7 +64,7 @@ def prepare(registry_path: Path, output: Path, rounds: int, seeds: int) -> dict[
                 },
                 "output": {
                     "save_round_metrics": True,
-                    "save_convergence": True,
+                    "save_convergence": False,
                 },
             },
             "sweep": {},
