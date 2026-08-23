@@ -14,12 +14,13 @@ class AlgorithmConfigError(ValueError):
 
 COMMON_PROTOCOL_KEYS = {
     "ch_ratio", "candidate_ratio", "competition_radius_m",
-    "layer_spacing_m", "recluster_interval_rounds",
+    "layer_spacing_m", "recluster_interval_rounds", "recluster_trigger_mode",
 }
 EULC_PROTOCOL_KEYS = {
     "ch_ratio", "candidate_ratio", "initial_layer_width_m",
     "layer_spacing_increment_m", "competition_radius_mode",
     "competition_adjustment_factor", "recluster_interval_rounds",
+    "recluster_trigger_mode",
 }
 OPTIMIZER_NAMES = {
     "eulc_pso": "pso", "eulc_ga": "ga",
@@ -72,9 +73,9 @@ def validate_algorithm_config(config: dict[str, Any]) -> None:
     if unknown_protocol:
         raise AlgorithmConfigError(f"Unknown protocol keys: {sorted(unknown_protocol)}")
     required_protocol = (
-        EULC_PROTOCOL_KEYS - {"ch_ratio"}
+        EULC_PROTOCOL_KEYS - {"ch_ratio", "recluster_trigger_mode"}
         if algorithm_id == "eulc"
-        else protocol_keys
+        else protocol_keys - {"recluster_trigger_mode"}
     )
     missing_protocol = required_protocol.difference(config["protocol"])
     if missing_protocol:
@@ -103,6 +104,12 @@ def validate_algorithm_config(config: dict[str, Any]) -> None:
             raise AlgorithmConfigError("layer_spacing_m must be positive")
     if int(config["protocol"]["recluster_interval_rounds"]) <= 0:
         raise AlgorithmConfigError("recluster_interval_rounds must be positive")
+    if config["protocol"].get("recluster_trigger_mode", "periodic") not in {
+        "periodic", "cluster_energy_mean", "hybrid"
+    }:
+        raise AlgorithmConfigError(
+            "recluster_trigger_mode must be periodic, cluster_energy_mean or hybrid"
+        )
 
     optimized = algorithm_id in OPTIMIZER_NAMES
     if optimized:
@@ -155,6 +162,7 @@ def apply_algorithm_config(case: dict[str, Any], algorithm_config: dict[str, Any
             "layer_spacing_increment_m", protocol.get("layer_spacing_m")
         ),
         "recluster_interval_rounds": protocol["recluster_interval_rounds"],
+        "recluster_trigger_mode": protocol.get("recluster_trigger_mode", "periodic"),
     })
     if "competition_radius_mode" in protocol:
         resolved["protocol"].update({

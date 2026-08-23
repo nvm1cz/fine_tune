@@ -136,6 +136,9 @@ def build_simulator(
             protocol.get("competition_adjustment_factor", 0.5)
         ),
         "recluster_interval": int(protocol["recluster_interval_rounds"]),
+        "recluster_trigger_mode": protocol.get(
+            "recluster_trigger_mode", "periodic"
+        ),
         "assignment_mode": protocol.get("assignment_mode", "strongest_rssi"),
         "fallback_assignment_mode": protocol.get(
             "fallback_assignment_mode", "nearest_feasible"

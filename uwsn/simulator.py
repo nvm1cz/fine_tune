@@ -15,6 +15,33 @@ from .routing.transmission import TransmissionStats, execute_round_transmissions
 from .routing.planning import RoutePlan, validate_assignments, validate_route_plan
 
 
+def clusters_below_mean_energy(
+    assignments: dict[int, list[int]],
+    cluster_heads: list[int],
+    energies: np.ndarray,
+    dead_energy_threshold_j: float,
+) -> list[dict[str, float | int]]:
+    """Find alive clusters whose CH energy is below the alive-cluster mean."""
+    triggered: list[dict[str, float | int]] = []
+    for ch in cluster_heads:
+        if energies[ch] <= dead_energy_threshold_j:
+            continue
+        alive_nodes = [ch] + [
+            node for node in assignments.get(ch, [])
+            if node != ch and energies[node] > dead_energy_threshold_j
+        ]
+        mean_energy = float(np.mean(energies[alive_nodes]))
+        ch_energy = float(energies[ch])
+        if ch_energy < mean_energy:
+            triggered.append({
+                "cluster_head": int(ch),
+                "cluster_head_energy_j": ch_energy,
+                "cluster_mean_energy_j": mean_energy,
+                "alive_cluster_nodes": len(alive_nodes),
+            })
+    return triggered
+
+
 class UWSNSimulator:
     def __init__(
         self,
@@ -79,6 +106,7 @@ class UWSNSimulator:
         self.optimization_events: list[dict[str, object]] = []
         self.round_configuration_history: list[dict[str, object]] = []
         self._pending_reoptimization_reason = "initial"
+        self._pending_energy_maintenance_clusters: list[dict[str, float | int]] = []
         self.last_routing_edges: list[tuple[int, int | None]] = []
         self.last_delay_records: list[float] = []
         self.transmission_stats = TransmissionStats()
@@ -130,15 +158,33 @@ class UWSNSimulator:
         return self.energies > self.params.dead_energy_threshold_j
 
     def _need_recluster(self, round_idx: int) -> bool:
+        self._pending_energy_maintenance_clusters = []
         if not self.current_assignments:
             self._pending_reoptimization_reason = "initial"
             return True
         if round_idx == 1:
             self._pending_reoptimization_reason = "initial"
             return True
-        if (round_idx - 1) % max(1, self.params.recluster_interval) == 0:
+        trigger_mode = self.params.recluster_trigger_mode
+        if trigger_mode not in {"periodic", "cluster_energy_mean", "hybrid"}:
+            raise ValueError(f"Unsupported recluster_trigger_mode: {trigger_mode}")
+        if (
+            trigger_mode in {"periodic", "hybrid"}
+            and (round_idx - 1) % max(1, self.params.recluster_interval) == 0
+        ):
             self._pending_reoptimization_reason = "periodic"
             return True
+        if trigger_mode in {"cluster_energy_mean", "hybrid"}:
+            triggered = clusters_below_mean_energy(
+                self.current_assignments,
+                self.current_chs,
+                self.energies,
+                self.params.dead_energy_threshold_j,
+            )
+            if triggered:
+                self._pending_energy_maintenance_clusters = triggered
+                self._pending_reoptimization_reason = "cluster_head_below_cluster_mean"
+                return True
         dead_chs = [
             ch for ch in self.current_chs
             if self.energies[ch] <= self.params.dead_energy_threshold_j
@@ -241,6 +287,9 @@ class UWSNSimulator:
                 "algorithm": self.algorithm_id,
                 "optimization_round": round_idx,
                 "reoptimization_reason": self._pending_reoptimization_reason,
+                "energy_maintenance_clusters": list(
+                    self._pending_energy_maintenance_clusters
+                ),
                 "selected_cluster_heads": list(self.current_chs),
                 "assignment_mode": self.algorithm_diagnostics.get(
                     "assignment_mode", "legacy"

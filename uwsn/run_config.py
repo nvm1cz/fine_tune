@@ -60,6 +60,7 @@ class TunableParams:
     reoptimize_on_invalid_assignment: bool = True
     reoptimize_on_broken_route: bool = True
     reoptimize_on_dead_ch_or_relay: bool = True
+    recluster_trigger_mode: str = "periodic"
     connectivity_penalty_enabled: bool = True
     pso_stagnation_restart_iterations: int = 5
     pso_stagnation_restart_fraction: float = 0.25
