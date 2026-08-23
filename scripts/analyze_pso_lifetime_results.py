@@ -18,8 +18,16 @@ from scipy.stats import wilcoxon
 SCENARIO_PATTERN = re.compile(
     r"(?P<density>[a-z]+)_n(?P<nodes>\d+)_p(?P<packet>\d+)_e(?P<energy_int>\d+)p(?P<energy_frac>\d+)"
 )
-VARIANT_LABELS = {"baseline": "PSO baseline", "selected": "PSO selected"}
-COLORS = {"baseline": "#4C78A8", "selected": "#F58518"}
+VARIANT_LABELS = {
+    "baseline": "PSO baseline",
+    "selected": "PSO selected",
+    "energy_maintenance": "PSO energy+beam",
+}
+COLORS = {
+    "baseline": "#4C78A8",
+    "selected": "#F58518",
+    "energy_maintenance": "#54A24B",
+}
 
 
 def _scenario_metadata(name: str) -> dict[str, Any]:
@@ -61,7 +69,11 @@ def _load(input_dir: Path, density: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         metadata = _scenario_metadata(scenario_dir.name)
         if metadata["density"] != density:
             continue
-        for variant in ("baseline", "selected"):
+        variant_names = sorted(
+            path.name for path in scenario_dir.iterdir()
+            if path.is_dir() and (path / "case_summary.csv").exists()
+        )
+        for variant in variant_names:
             variant_dir = scenario_dir / variant
             manifest = json.loads((variant_dir / "benchmark_manifest.json").read_text())
             if not manifest.get("completed") or int(manifest["completed_cases"]) != 30:
@@ -80,8 +92,11 @@ def _load(input_dir: Path, density: str) -> tuple[pd.DataFrame, pd.DataFrame]:
             rounds.append(round_frame)
     summary = pd.concat(summaries, ignore_index=True)
     round_frame = pd.concat(rounds, ignore_index=True)
-    if summary["scenario_id"].nunique() != 4 or len(summary) != 240:
-        raise ValueError("expected four scenarios and 240 summary rows")
+    expected_rows = summary["scenario_id"].nunique() * summary["variant"].nunique() * 30
+    if summary["scenario_id"].nunique() != 4 or len(summary) != expected_rows:
+        raise ValueError(
+            f"expected four scenarios and {expected_rows} summary rows"
+        )
     return summary, round_frame
 
 
@@ -121,7 +136,9 @@ def _summary_table(summary: pd.DataFrame) -> pd.DataFrame:
     ]
     for keys, group in summary.groupby(group_columns, sort=True):
         row = dict(zip(group_columns, keys))
-        row["algorithm"] = VARIANT_LABELS[row["variant"]]
+        row["algorithm"] = VARIANT_LABELS.get(
+            row["variant"], str(row["variant"]).replace("_", " ").title()
+        )
         row["max_rounds"] = 500
         row["n_seeds"] = len(group)
         for source, target in metrics.items():
@@ -142,6 +159,13 @@ def _paired_comparisons(summary: pd.DataFrame) -> pd.DataFrame:
         "packet_delivery_ratio", "average_e2e_delay_s", "runtime_seconds",
     ]
     rows = []
+    if not {"baseline", "selected"}.issubset(set(summary["variant"])):
+        return pd.DataFrame(columns=[
+            "scenario_id", "metric", "n_pairs", "baseline_mean",
+            "selected_mean", "mean_difference_selected_minus_baseline",
+            "difference_ci95_low", "difference_ci95_high", "median_difference",
+            "wilcoxon_p_value_uncorrected", "paired_direction_effect",
+        ])
     for scenario_id, scenario in summary.groupby("scenario_id", sort=True):
         baseline = scenario[scenario["variant"] == "baseline"].set_index("seed")
         selected = scenario[scenario["variant"] == "selected"].set_index("seed")
@@ -202,17 +226,20 @@ def _plot_round_metric(
         ["packet_size_bits", "initial_energy_j"], ascending=[False, False]
     )["scenario_id"].drop_duplicates())
     fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=True, sharey=True)
+    variants = list(summary["variant"].drop_duplicates())
     for ax, scenario_id in zip(axes.flat, scenarios):
         scenario = extended[extended["scenario_id"] == scenario_id]
         metadata = summary[summary["scenario_id"] == scenario_id].iloc[0]
-        for variant in ("baseline", "selected"):
+        for variant in variants:
             values = scenario[scenario["variant"] == variant]
             grouped = values.groupby("round")[metric]
             mean = grouped.mean()
             sem = grouped.sem().fillna(0.0)
             ci = 1.96 * sem
-            ax.plot(mean.index, mean, color=COLORS[variant], lw=1.8, label=VARIANT_LABELS[variant])
-            ax.fill_between(mean.index, mean - ci, mean + ci, color=COLORS[variant], alpha=0.16)
+            color = COLORS.get(variant, "#777777")
+            label = VARIANT_LABELS.get(variant, variant.replace("_", " ").title())
+            ax.plot(mean.index, mean, color=color, lw=1.8, label=label)
+            ax.fill_between(mean.index, mean - ci, mean + ci, color=color, alpha=0.16)
         ax.set_title(_scenario_title(metadata))
         ax.set_xlim(1, 500)
         ax.set_ylim(*ylim)
@@ -222,7 +249,8 @@ def _plot_round_metric(
     for ax in axes[:, 0]:
         ax.set_ylabel(ylabel)
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.suptitle(f"Sparse UWSN: {ylabel} by round (mean ± 95% CI)", y=0.995)
+    density_name = str(summary["density"].iloc[0]).title()
+    fig.suptitle(f"{density_name} UWSN: {ylabel} by round (mean ± 95% CI)", y=0.995)
     fig.legend(
         handles, labels, loc="upper center", ncol=2, frameon=False,
         bbox_to_anchor=(0.5, 0.967),
@@ -240,16 +268,21 @@ def _plot_lifetime(summary: pd.DataFrame, output: Path) -> None:
     max_event = float(summary[["fnd_round", "hnd_round", "lnd_round"]].max().max())
     fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharey=True)
     x = np.arange(3)
-    width = 0.36
+    variants = list(summary["variant"].drop_duplicates())
+    width = min(0.7 / max(len(variants), 1), 0.5)
+    offsets = (np.arange(len(variants)) - (len(variants) - 1) / 2) * width
     for ax, scenario_id in zip(axes.flat, scenarios):
         scenario = summary[summary["scenario_id"] == scenario_id]
         metadata = scenario.iloc[0]
-        for offset, variant in ((-width / 2, "baseline"), (width / 2, "selected")):
+        for offset, variant in zip(offsets, variants):
             group = scenario[scenario["variant"] == variant]
             means = [group[column].mean() for column in ("fnd_round", "hnd_round", "lnd_round")]
             stds = [group[column].std(ddof=1) for column in ("fnd_round", "hnd_round", "lnd_round")]
-            ax.bar(x + offset, means, width, yerr=stds, capsize=3,
-                   color=COLORS[variant], label=VARIANT_LABELS[variant])
+            ax.bar(
+                x + offset, means, width, yerr=stds, capsize=3,
+                color=COLORS.get(variant, "#777777"),
+                label=VARIANT_LABELS.get(variant, variant.replace("_", " ").title()),
+            )
         ax.set_title(_scenario_title(metadata))
         ax.set_xticks(x, ["FND", "HND", "LND"])
         ax.set_ylim(0, math.ceil(max_event * 1.18 / 10) * 10)
@@ -257,7 +290,8 @@ def _plot_lifetime(summary: pd.DataFrame, output: Path) -> None:
     for ax in axes[:, 0]:
         ax.set_ylabel("Round")
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.suptitle("Sparse UWSN network lifetime events (mean ± SD)", y=0.995)
+    density_name = str(summary["density"].iloc[0]).title()
+    fig.suptitle(f"{density_name} UWSN network lifetime events (mean ± SD)", y=0.995)
     fig.legend(
         handles, labels, loc="upper center", ncol=2, frameon=False,
         bbox_to_anchor=(0.5, 0.967),
@@ -283,16 +317,20 @@ def _plot_distributions(summary: pd.DataFrame, output: Path) -> None:
     data_by_metric = {metric: [] for metric, _ in metrics}
     colors = []
     position = 1
+    variants = list(summary["variant"].drop_duplicates())
     for scenario_id in scenarios:
         metadata = summary[summary["scenario_id"] == scenario_id].iloc[0]
         short = f"{int(metadata['packet_size_bits'])}\n{metadata['initial_energy_j']:.1f}J"
-        for variant in ("baseline", "selected"):
+        for variant in variants:
             group = summary[(summary["scenario_id"] == scenario_id) & (summary["variant"] == variant)]
             for metric, _ in metrics:
                 data_by_metric[metric].append(group[metric].dropna().to_numpy())
             positions.append(position)
-            labels.append(f"{short}\n{'B' if variant == 'baseline' else 'S'}")
-            colors.append(COLORS[variant])
+            abbreviation = {
+                "baseline": "B", "selected": "S", "energy_maintenance": "E+B"
+            }.get(variant, variant[:3].upper())
+            labels.append(f"{short}\n{abbreviation}")
+            colors.append(COLORS.get(variant, "#777777"))
             position += 1
         position += 0.6
     for ax, (metric, ylabel) in zip(axes, metrics):
@@ -304,7 +342,8 @@ def _plot_distributions(summary: pd.DataFrame, output: Path) -> None:
         ax.set_xticks(positions, labels, fontsize=8)
         ax.set_ylabel(ylabel)
         ax.grid(axis="y", alpha=0.25)
-    fig.suptitle("Sparse UWSN outcome distributions across 30 paired seeds")
+    density_name = str(summary["density"].iloc[0]).title()
+    fig.suptitle(f"{density_name} UWSN outcome distributions across 30 seeds")
     fig.tight_layout()
     fig.savefig(output.with_suffix(".png"), dpi=300, bbox_inches="tight")
     fig.savefig(output.with_suffix(".pdf"), bbox_inches="tight")
@@ -401,11 +440,12 @@ def analyze(input_dir: Path, density: str, output: Path) -> None:
     markdown = [
         f"# {density.title()} PSO Lifetime Analysis",
         "",
-        f"- Complete jobs: 8/8; paired seeds: 30; summary rows: {quality['rows']}.",
+        f"- Complete jobs: {summary['scenario_id'].nunique() * summary['variant'].nunique()}; "
+        f"paired seeds: 30; summary rows: {quality['rows']}.",
         f"- FND/HND/LND ordering violations: {quality['event_order_violations']}.",
         f"- Missing FND/HND/LND: {quality['missing_fnd']}/"
         f"{quality['missing_hnd']}/{quality['missing_lnd']}.",
-        "- Statistical comparisons use paired Wilcoxon signed-rank tests; p-values are exploratory.",
+        "- Paired Wilcoxon comparisons are emitted only when both baseline and selected variants are present.",
         "- Lifetime curves retain the final state after LND through round 500 for a common x-axis.",
     ]
     (output / f"{density}_analysis_report.md").write_text(
