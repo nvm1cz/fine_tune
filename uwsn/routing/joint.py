@@ -21,6 +21,24 @@ from .transmission import contention_multiplier
 from ..run_config import TunableParams
 
 
+def beam_parent_combinations(
+    option_lists: Sequence[Sequence[int | None]], beam_width: int,
+) -> list[tuple[int | None, ...]]:
+    """Keep deterministic low-rank partial parent combinations."""
+    beam: list[tuple[int, tuple[int | None, ...]]] = [(0, ())]
+    for options in option_lists:
+        expanded = [
+            (score + rank, combination + (option,))
+            for score, combination in beam
+            for rank, option in enumerate(options)
+        ]
+        expanded.sort(key=lambda item: (
+            item[0], tuple(-1 if value is None else int(value) for value in item[1])
+        ))
+        beam = expanded[:beam_width]
+    return [combination for _, combination in beam]
+
+
 def infeasible_objective(reason: str) -> ObjectiveResult:
     return ObjectiveResult(
         objective_value=float("inf"),
@@ -147,7 +165,15 @@ def optimize_route_plan(
     evaluator = evaluator or EnergyDelayObjective()
     route_started = time.perf_counter() if evaluator.cache.profile else 0.0
     params = context.params
-    limit = max(1, int(getattr(params, "routing_plan_search_limit", 128)))
+    search_mode = getattr(params, "routing_search_mode", "exhaustive")
+    if search_mode not in {"exhaustive", "beam"}:
+        raise ValueError(f"Unsupported routing_search_mode: {search_mode}")
+    configured_limit = max(1, int(getattr(params, "routing_plan_search_limit", 128)))
+    beam_width = max(1, int(getattr(params, "routing_beam_width", 8)))
+    relay_limit = max(
+        1, int(getattr(params, "routing_relay_candidates_per_ch", 2))
+    )
+    limit = min(configured_limit, beam_width) if search_mode == "beam" else configured_limit
 
     def finish(
         value: CandidateEvaluation,
@@ -224,6 +250,8 @@ def optimize_route_plan(
                 int(node),
             )
         )
+        if search_mode == "beam":
+            relays = relays[:relay_limit]
         choices.extend(relays)
         if not choices:
             solution = CandidateSolution(selected, assignment.assignments, {})
@@ -236,7 +264,12 @@ def optimize_route_plan(
     best: CandidateEvaluation | None = None
     evaluated = 0
     option_lists = [options[ch] for ch in selected]
-    for combination in product(*option_lists):
+    combinations = (
+        beam_parent_combinations(option_lists, beam_width)
+        if search_mode == "beam"
+        else product(*option_lists)
+    )
+    for combination in combinations:
         if evaluated >= limit:
             break
         parents = dict(zip(selected, combination))
@@ -278,9 +311,15 @@ def optimize_route_plan(
         invalid_reason=plan.invalid_reason,
         diagnostics={
             **dict(plan.diagnostics),
-            "routing_mode": "joint_optimized",
+            "routing_mode": (
+                "joint_optimized_beam" if search_mode == "beam"
+                else "joint_optimized"
+            ),
             "plans_evaluated": evaluated,
             "search_limit": limit,
+            "routing_search_mode": search_mode,
+            "beam_width": beam_width if search_mode == "beam" else None,
+            "relay_candidates_per_ch": relay_limit if search_mode == "beam" else None,
         },
         plan_id=plan.plan_id,
     )

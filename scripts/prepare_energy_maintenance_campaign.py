@@ -18,6 +18,13 @@ def main() -> None:
     parser.add_argument("--density", choices=("sparse", "medium", "dense"), required=True)
     parser.add_argument("--output-campaign", type=Path, required=True)
     parser.add_argument("--algorithm-dir", type=Path, required=True)
+    parser.add_argument("--experiment-dir", type=Path)
+    parser.add_argument(
+        "--routing-search-mode", choices=("exhaustive", "beam"),
+        default="exhaustive",
+    )
+    parser.add_argument("--beam-width", type=int, default=8)
+    parser.add_argument("--relay-candidates-per-ch", type=int, default=2)
     args = parser.parse_args()
 
     source = json.loads(args.source_campaign.read_text(encoding="utf-8"))
@@ -42,6 +49,33 @@ def main() -> None:
         updated["variant"] = "energy_maintenance"
         updated["algorithm_config"] = str(destination)
         updated["recluster_trigger_mode"] = "cluster_energy_mean"
+        if args.routing_search_mode == "beam":
+            if args.experiment_dir is None:
+                raise ValueError("--experiment-dir is required for beam routing")
+            experiment = json.loads(
+                Path(job["experiment_config"]).read_text(encoding="utf-8")
+            )
+            protocol = experiment.setdefault("overrides", {}).setdefault(
+                "protocol", {}
+            )
+            protocol.update({
+                "routing_search_mode": "beam",
+                "routing_beam_width": int(args.beam_width),
+                "routing_relay_candidates_per_ch": int(
+                    args.relay_candidates_per_ch
+                ),
+            })
+            experiment_destination = (
+                args.experiment_dir
+                / f"pso_energy_maintenance_beam__{job['scenario_id']}.yaml"
+            )
+            _write(experiment_destination, experiment)
+            updated["experiment_config"] = str(experiment_destination)
+            updated["routing_search_mode"] = "beam"
+            updated["routing_beam_width"] = int(args.beam_width)
+            updated["routing_relay_candidates_per_ch"] = int(
+                args.relay_candidates_per_ch
+            )
         jobs.append(updated)
 
     campaign = {
@@ -53,6 +87,14 @@ def main() -> None:
         "scenario_count": 4,
         "job_count": 4,
         "recluster_trigger_mode": "cluster_energy_mean",
+        "routing_search_mode": args.routing_search_mode,
+        "routing_beam_width": (
+            int(args.beam_width) if args.routing_search_mode == "beam" else None
+        ),
+        "routing_relay_candidates_per_ch": (
+            int(args.relay_candidates_per_ch)
+            if args.routing_search_mode == "beam" else None
+        ),
         "reference": {
             "citation": (
                 "Yi et al., Non-Uniform Clustering Algorithm for UWSNs Based "

@@ -22,6 +22,11 @@ def main() -> None:
     parser.add_argument("--algorithm", type=Path, required=True)
     parser.add_argument("--rounds", type=int, default=50)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
+    parser.add_argument(
+        "--modes", nargs="+",
+        choices=("periodic", "cluster_energy_mean"),
+        default=["periodic", "cluster_energy_mean"],
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -32,7 +37,7 @@ def main() -> None:
     for seed in args.seeds:
         if seed not in by_seed:
             raise ValueError(f"seed {seed} not present in experiment")
-        for mode in ("periodic", "cluster_energy_mean"):
+        for mode in args.modes:
             algorithm = copy.deepcopy(raw_algorithm)
             algorithm["protocol"]["recluster_trigger_mode"] = mode
             simulator, execution = build_simulator(copy.deepcopy(by_seed[seed]), algorithm)
@@ -46,6 +51,10 @@ def main() -> None:
                 str(event["reoptimization_reason"])
                 for event in simulator.optimization_events
             )
+            route_diagnostics = (
+                dict(simulator.current_route_plan.diagnostics)
+                if simulator.current_route_plan is not None else {}
+            )
             rows.append({
                 "seed": seed,
                 "mode": mode,
@@ -56,6 +65,14 @@ def main() -> None:
                 "hnd_round": metrics.hnd_round,
                 "lnd_round": metrics.lnd_round,
                 "final_residual_energy_j": metrics.residual_energy,
+                "objective_J": (
+                    simulator.current_objective_result.objective_J
+                    if simulator.current_objective_result is not None else None
+                ),
+                "route_plans_evaluated_for_selected_solution": (
+                    route_diagnostics.get("plans_evaluated")
+                ),
+                "routing_search_mode": route_diagnostics.get("routing_search_mode"),
                 "periodic_refreshes": reasons.get("periodic", 0),
                 "energy_mean_refreshes": reasons.get(
                     "cluster_head_below_cluster_mean", 0

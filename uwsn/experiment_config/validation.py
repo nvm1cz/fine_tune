@@ -46,6 +46,8 @@ SECTION_KEYS = {
         "require_all_alive_nodes_assigned", "routing_mode",
         "reuse_optimized_route_plan", "validate_route_every_round",
         "routing_max_hops", "routing_plan_search_limit",
+        "routing_search_mode", "routing_beam_width",
+        "routing_relay_candidates_per_ch",
         "reoptimize_on_invalid_assignment", "reoptimize_on_broken_route",
         "reoptimize_on_dead_ch_or_relay",
         "competition_radius_mode", "competition_adjustment_factor",
@@ -220,6 +222,14 @@ def validate_case(case: Mapping[str, Any]) -> None:
         raise ConfigError("routing_max_hops must be positive")
     if int(protocol.get("routing_plan_search_limit", 128)) <= 0:
         raise ConfigError("routing_plan_search_limit must be positive")
+    if protocol.get("routing_search_mode", "exhaustive") not in {
+        "exhaustive", "beam"
+    }:
+        raise ConfigError("routing_search_mode must be exhaustive or beam")
+    if int(protocol.get("routing_beam_width", 8)) <= 0:
+        raise ConfigError("routing_beam_width must be positive")
+    if int(protocol.get("routing_relay_candidates_per_ch", 2)) <= 0:
+        raise ConfigError("routing_relay_candidates_per_ch must be positive")
     if protocol.get("competition_radius_mode", "dynamic_eulc") != "dynamic_eulc":
         raise ConfigError("competition_radius_mode must be dynamic_eulc")
     if not 0.0 <= float(protocol.get("competition_adjustment_factor", 0.5)) <= 1.0:

@@ -57,6 +57,9 @@ class TunableParams:
     validate_route_every_round: bool = True
     routing_max_hops: int = 100
     routing_plan_search_limit: int = 128
+    routing_search_mode: str = "exhaustive"
+    routing_beam_width: int = 8
+    routing_relay_candidates_per_ch: int = 2
     reoptimize_on_invalid_assignment: bool = True
     reoptimize_on_broken_route: bool = True
     reoptimize_on_dead_ch_or_relay: bool = True

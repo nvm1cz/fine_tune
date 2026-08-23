@@ -157,6 +157,11 @@ def build_simulator(
         "routing_plan_search_limit": int(
             protocol.get("routing_plan_search_limit", 128)
         ),
+        "routing_search_mode": protocol.get("routing_search_mode", "exhaustive"),
+        "routing_beam_width": int(protocol.get("routing_beam_width", 8)),
+        "routing_relay_candidates_per_ch": int(
+            protocol.get("routing_relay_candidates_per_ch", 2)
+        ),
         "reoptimize_on_invalid_assignment": bool(
             protocol.get("reoptimize_on_invalid_assignment", True)
         ),

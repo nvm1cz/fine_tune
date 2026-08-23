@@ -7,7 +7,7 @@ import numpy as np
 
 from uwsn.algorithms import create_algorithm
 from uwsn.cases import SimulationCase
-from uwsn.routing.joint import optimize_route_plan
+from uwsn.routing.joint import beam_parent_combinations, optimize_route_plan
 from uwsn.objective import EnergyDelayObjective, EvaluationContext
 from uwsn.routing.planning import (
     AssignmentResult,
@@ -57,6 +57,14 @@ class JointRoutingTests(unittest.TestCase):
             normalization_epsilon=1e-12,
             params=self.params,
         )
+
+    def test_beam_parent_combinations_are_bounded_and_deterministic(self) -> None:
+        options = [(None, 1, 2), (None, 2, 3), (None, 3, 4)]
+        first = beam_parent_combinations(options, 4)
+        second = beam_parent_combinations(options, 4)
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 4)
+        self.assertEqual(first[0], (None, None, None))
 
     def test_strongest_rssi_assignment_and_deterministic_tie_break(self) -> None:
         result = assign_members_strongest_rssi(
