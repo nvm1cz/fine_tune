@@ -241,8 +241,14 @@ def _plot_round_metric(
             ax.plot(mean.index, mean, color=color, lw=1.8, label=label)
             ax.fill_between(mean.index, mean - ci, mean + ci, color=color, alpha=0.16)
         ax.set_title(_scenario_title(metadata))
-        ax.set_xlim(1, 500)
+        ax.set_xlim(0, 500)
+        ax.set_xticks([0, 100, 200, 300, 400, 500])
         ax.set_ylim(*ylim)
+        # Shared limits keep panels comparable, but Matplotlib hides inner tick
+        # labels by default. Publication figures require numeric ticks on every
+        # individual subplot.
+        ax.tick_params(axis="x", which="both", labelbottom=True)
+        ax.tick_params(axis="y", which="both", labelleft=True)
         ax.grid(alpha=0.25)
     for ax in axes[-1, :]:
         ax.set_xlabel("Round")
